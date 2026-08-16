@@ -1,7 +1,10 @@
 # ローカル開発用のシークレット。`.dev.vars` にコピーして使ってください(gitignore済み)。
 # 本番ではこのファイルではなく `wrangler secret put <NAME>` で設定します。
+# ここに書いたキーは wrangler.toml の [vars] と同名でも local dev では優先されます。
 
 JWT_SECRET="change-me-to-a-random-secret"
+ENVIRONMENT="development"
+APP_URL="http://localhost:5173"
 
 # Stripe(課金機能を使う場合のみ)
 # STRIPE_SECRET_KEY="sk_test_..."

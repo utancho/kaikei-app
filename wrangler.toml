@@ -11,14 +11,17 @@ binding = "ASSETS"
 not_found_handling = "single-page-application"
 run_worker_first = ["/api/*"]
 
+# この [vars] は `wrangler deploy` (本番) で使われる値。
+# ローカルの `wrangler dev` では .dev.vars の同名キーが優先されるため、
+# .dev.vars 側に development 用の値を書くこと(直接ここは書き換えない)。
 [vars]
-APP_URL = "http://localhost:5173"
-ENVIRONMENT = "development"
+APP_URL = "https://kaikei-app.suzu-e97.workers.dev"
+ENVIRONMENT = "production"
 
 [[d1_databases]]
 binding = "DB"
 database_name = "kaikei-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "e7e8c115-5101-411f-9e37-c4f548948930"
 migrations_dir = "server/migrations"
 
 # 本番用の値は Cloudflareダッシュボード / `wrangler secret put` で設定してください。
