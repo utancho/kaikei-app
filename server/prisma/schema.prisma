@@ -1,0 +1,321 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NOTE: SQLite has no native enum support in Prisma, so enum-like fields are
+// plain Strings. Valid values are documented per field and enforced in
+// src/lib/enums.ts + zod schemas at the API boundary.
+
+// ---------------------------------------------------------------------------
+// 事業者 (会社 or 個人事業主)
+// ---------------------------------------------------------------------------
+model Business {
+  id                    String   @id @default(cuid())
+  name                  String // 屋号 or 会社名
+  type                  String   @default("INDIVIDUAL") // INDIVIDUAL | CORPORATE
+  representativeName    String?
+  postalCode            String?
+  address               String?
+  fiscalYearStartMonth  Int      @default(1) // 個人は1固定、法人は任意
+  taxationType          String   @default("EXEMPT") // EXEMPT(免税) | GENERAL(本則課税) | SIMPLIFIED(簡易課税)
+  blueReturnDeduction   Int      @default(0) // 青色申告特別控除額 (0 | 100000 | 550000 | 650000)、個人事業主のみ意味を持つ
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  fiscalYears     FiscalYear[]
+  accounts        Account[]
+  partners        Partner[]
+  journalEntries  JournalEntry[]
+  invoices        Invoice[]
+  importBatches   BankImportBatch[]
+  fixedAssets     FixedAsset[]
+  entryTemplates  JournalEntryTemplate[]
+}
+
+// ---------------------------------------------------------------------------
+// 会計期間
+// ---------------------------------------------------------------------------
+model FiscalYear {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  startDate  DateTime
+  endDate    DateTime
+  status     String   @default("OPEN") // OPEN | CLOSED
+
+  journalEntries JournalEntry[]
+
+  @@index([businessId])
+}
+
+// ---------------------------------------------------------------------------
+// 勘定科目
+// ---------------------------------------------------------------------------
+model Account {
+  id                   String   @id @default(cuid())
+  businessId           String
+  business             Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  code                 String // 科目コード
+  name                 String // 科目名
+  category             String // ASSET | LIABILITY | EQUITY | REVENUE | EXPENSE
+  subcategory          String // 表示グルーピング (流動資産 / 固定負債 / 販売費及び一般管理費 etc.)
+  normalBalance        String // DEBIT | CREDIT
+  isDefault            Boolean  @default(false) // システム標準科目か
+  isActive             Boolean  @default(true)
+  displayOrder         Int      @default(0)
+  defaultTaxCategoryId String?
+  defaultTaxCategory   TaxCategory? @relation(fields: [defaultTaxCategoryId], references: [id])
+
+  subAccounts   SubAccount[]
+  lines         JournalEntryLine[]
+  templateLines JournalEntryTemplateLine[]
+
+  @@unique([businessId, code])
+  @@index([businessId, category])
+}
+
+model SubAccount {
+  id        String  @id @default(cuid())
+  accountId String
+  account   Account @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  name      String
+  isActive  Boolean @default(true)
+
+  lines JournalEntryLine[]
+
+  @@index([accountId])
+}
+
+// ---------------------------------------------------------------------------
+// 税区分
+// ---------------------------------------------------------------------------
+model TaxCategory {
+  id            String  @id @default(cuid())
+  code          String  @unique
+  name          String
+  rate          Float // 0, 0.08, 0.10 etc.
+  kind          String // TAXABLE_SALES | TAXABLE_PURCHASE | EXEMPT | OUT_OF_SCOPE | EXPORT
+  isReducedRate Boolean @default(false)
+
+  accounts      Account[]
+  lines         JournalEntryLine[]
+  invoiceItems  InvoiceItem[]
+  templateLines JournalEntryTemplateLine[]
+}
+
+// ---------------------------------------------------------------------------
+// 取引先
+// ---------------------------------------------------------------------------
+model Partner {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name       String
+  kana       String?
+  type       String   @default("BOTH") // CUSTOMER | VENDOR | BOTH
+  postalCode String?
+  address    String?
+  email      String?
+  phone      String?
+  createdAt  DateTime @default(now())
+
+  lines         JournalEntryLine[]
+  invoices      Invoice[]
+  templateLines JournalEntryTemplateLine[]
+
+  @@index([businessId])
+}
+
+// ---------------------------------------------------------------------------
+// 仕訳
+// ---------------------------------------------------------------------------
+model JournalEntry {
+  id           String   @id @default(cuid())
+  businessId   String
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  fiscalYearId String
+  fiscalYear   FiscalYear @relation(fields: [fiscalYearId], references: [id])
+  entryNumber  Int
+  entryDate    DateTime
+  description  String? // 摘要(全体)
+  status       String   @default("CONFIRMED") // DRAFT | CONFIRMED
+  source       String   @default("MANUAL") // MANUAL | BANK_IMPORT | INVOICE
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  lines JournalEntryLine[]
+
+  @@index([businessId, entryDate])
+  @@index([businessId, fiscalYearId])
+}
+
+model JournalEntryLine {
+  id             String       @id @default(cuid())
+  journalEntryId String
+  journalEntry   JournalEntry @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  lineNumber     Int
+  side           String // DEBIT | CREDIT (借方 | 貸方)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id])
+  subAccountId   String?
+  subAccount     SubAccount?  @relation(fields: [subAccountId], references: [id])
+  partnerId      String?
+  partner        Partner?     @relation(fields: [partnerId], references: [id])
+  taxCategoryId  String?
+  taxCategory    TaxCategory? @relation(fields: [taxCategoryId], references: [id])
+  amount         Int // 円 (税込金額)
+  taxAmount      Int          @default(0)
+  description    String? // 摘要(明細)
+
+  @@index([journalEntryId])
+  @@index([accountId])
+}
+
+// ---------------------------------------------------------------------------
+// 請求書
+// ---------------------------------------------------------------------------
+model Invoice {
+  id            String   @id @default(cuid())
+  businessId    String
+  business      Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  partnerId     String
+  partner       Partner  @relation(fields: [partnerId], references: [id])
+  invoiceNumber String
+  issueDate     DateTime
+  dueDate       DateTime?
+  status        String   @default("DRAFT") // DRAFT | SENT | PAID | VOID
+  notes         String?
+  subtotal      Int      @default(0)
+  taxAmount     Int      @default(0)
+  total         Int      @default(0)
+  createdAt     DateTime @default(now())
+
+  items InvoiceItem[]
+
+  @@index([businessId])
+}
+
+model InvoiceItem {
+  id            String       @id @default(cuid())
+  invoiceId     String
+  invoice       Invoice      @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  lineNumber    Int
+  description   String
+  quantity      Float        @default(1)
+  unitPrice     Int
+  taxCategoryId String?
+  taxCategory   TaxCategory? @relation(fields: [taxCategoryId], references: [id])
+  amount        Int // quantity * unitPrice
+
+  @@index([invoiceId])
+}
+
+// ---------------------------------------------------------------------------
+// 銀行/カード明細CSV取込
+// ---------------------------------------------------------------------------
+model BankImportBatch {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  fileName   String
+  accountId  String // 取込先の勘定科目(普通預金 等)
+  importedAt DateTime @default(now())
+
+  rows BankTransactionRow[]
+
+  @@index([businessId])
+}
+
+model BankTransactionRow {
+  id                    String   @id @default(cuid())
+  batchId               String
+  batch                 BankImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  date                  DateTime
+  description           String
+  amount                Int // 正=入金, 負=出金
+  balance               Int?
+  suggestedAccountId    String?
+  status                String   @default("UNMATCHED") // UNMATCHED | MATCHED | IGNORED
+  matchedJournalEntryId String?
+
+  @@index([batchId])
+}
+
+// ---------------------------------------------------------------------------
+// 固定資産台帳
+// ---------------------------------------------------------------------------
+model FixedAsset {
+  id                 String   @id @default(cuid())
+  businessId         String
+  business           Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name               String // 資産名 (例: 営業用軽自動車)
+  assetAccountId     String // 資産科目 (車両運搬具 等)
+  expenseAccountId   String // 費用科目 (通常は減価償却費)
+  acquisitionDate    DateTime
+  acquisitionCost    Int // 取得価額
+  residualValue      Int      @default(1) // 残存価額(備忘価額。通常1円)
+  usefulLifeYears    Int // 耐用年数
+  depreciationMethod String // STRAIGHT_LINE(定額法) | DECLINING_BALANCE(定率法)
+  status             String   @default("ACTIVE") // ACTIVE | DISPOSED
+  disposedDate       DateTime?
+  memo               String?
+  createdAt          DateTime @default(now())
+
+  depreciations FixedAssetDepreciation[]
+
+  @@index([businessId])
+}
+
+model FixedAssetDepreciation {
+  id           String     @id @default(cuid())
+  fixedAssetId String
+  fixedAsset   FixedAsset @relation(fields: [fixedAssetId], references: [id], onDelete: Cascade)
+  fiscalYearId String
+  amount       Int // 当期計上した減価償却費
+  journalEntryId String?
+  postedAt     DateTime   @default(now())
+
+  @@unique([fixedAssetId, fiscalYearId])
+  @@index([fixedAssetId])
+}
+
+// ---------------------------------------------------------------------------
+// よく使う仕訳テンプレート
+// ---------------------------------------------------------------------------
+model JournalEntryTemplate {
+  id          String   @id @default(cuid())
+  businessId  String
+  business    Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  name        String // 例: 家賃支払い
+  description String? // 仕訳の摘要デフォルト値
+  displayOrder Int     @default(0)
+  createdAt   DateTime @default(now())
+
+  lines JournalEntryTemplateLine[]
+
+  @@index([businessId])
+}
+
+model JournalEntryTemplateLine {
+  id             String               @id @default(cuid())
+  templateId     String
+  template       JournalEntryTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  lineNumber     Int
+  side           String // DEBIT | CREDIT
+  accountId      String
+  account        Account              @relation(fields: [accountId], references: [id])
+  partnerId      String?
+  partner        Partner?             @relation(fields: [partnerId], references: [id])
+  taxCategoryId  String?
+  taxCategory    TaxCategory?         @relation(fields: [taxCategoryId], references: [id])
+  amountDefault  Int? // 金額の初期値(毎回異なる場合は空)
+  description    String?
+
+  @@index([templateId])
+  @@index([accountId])
+}
