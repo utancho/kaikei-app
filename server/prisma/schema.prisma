@@ -53,6 +53,7 @@ model Business {
   address               String?
   fiscalYearStartMonth  Int      @default(1) // 個人は1固定、法人は任意
   taxationType          String   @default("EXEMPT") // EXEMPT(免税) | GENERAL(本則課税) | SIMPLIFIED(簡易課税)
+  simplifiedTaxCategory Int      @default(5) // 簡易課税のみなし仕入率の事業区分(1〜6種)、SIMPLIFIEDのみ意味を持つ
   blueReturnDeduction   Int      @default(0) // 青色申告特別控除額 (0 | 100000 | 550000 | 650000)、個人事業主のみ意味を持つ
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt

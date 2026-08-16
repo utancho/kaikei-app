@@ -12,6 +12,7 @@ export interface Business {
   address?: string | null;
   fiscalYearStartMonth: number;
   taxationType: string;
+  simplifiedTaxCategory: number;
   blueReturnDeduction: number;
 }
 
@@ -261,6 +262,42 @@ export interface BlueReturnStatement {
   blueReturnDeduction: number;
   finalIncome: number;
   balanceSheet: BalanceSheet;
+}
+
+export interface RateGroup {
+  base: number;
+  tax: number;
+}
+
+export interface NationalLocalTax {
+  national: number;
+  local: number;
+}
+
+export interface ConsumptionTaxReturn {
+  business: { name: string; taxationType: string };
+  period: { from: string; to: string };
+  isExempt: boolean;
+  taxableSales: { standard: RateGroup; reduced: RateGroup };
+  outputTax: { standard: NationalLocalTax; reduced: NationalLocalTax; total: number };
+  exemptSales: number;
+  outOfScopeSales: number;
+  exportSales: number;
+  taxablePurchases?: { standard: RateGroup; reduced: RateGroup };
+  inputTax?: { standard: NationalLocalTax; reduced: NationalLocalTax; total: number };
+  simplified?: {
+    businessCategory: number;
+    businessCategoryLabel: string;
+    deemedPurchaseRate: number;
+    deemedInputTax: number;
+  };
+  payableTax?: { national: number; local: number; total: number };
+}
+
+export interface SimplifiedTaxCategory {
+  id: number;
+  label: string;
+  rate: number;
 }
 
 export interface PartnerBalance {

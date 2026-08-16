@@ -16,6 +16,7 @@ import {
   Package,
   Repeat,
   FileBadge,
+  Percent,
   Contact,
   BarChart3,
   LogOut,
@@ -40,6 +41,7 @@ const NAV_ITEMS = [
   { to: "/reports/monthly-trend", label: "月次推移表", icon: BarChart3 },
   { to: "/reports/partner-balances", label: "取引先別残高", icon: Contact },
   { to: "/reports/blue-return", label: "青色申告決算書", icon: FileBadge, individualOnly: true },
+  { to: "/reports/consumption-tax", label: "消費税申告書", icon: Percent },
   { to: "/accounts", label: "勘定科目", icon: ListTree },
   { to: "/settings", label: "設定", icon: SettingsIcon },
 ];

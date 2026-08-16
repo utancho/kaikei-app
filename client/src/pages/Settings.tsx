@@ -40,14 +40,21 @@ export default function Settings() {
   const [name, setName] = useState("");
   const [representativeName, setRepresentativeName] = useState("");
   const [taxationType, setTaxationType] = useState("EXEMPT");
+  const [simplifiedTaxCategory, setSimplifiedTaxCategory] = useState(5);
   const [blueReturnDeduction, setBlueReturnDeduction] = useState(0);
   const [saving, setSaving] = useState(false);
+  const [taxCategories, setTaxCategories] = useState<{ id: number; label: string; rate: number }[]>([]);
+
+  useEffect(() => {
+    api.getSimplifiedTaxCategories().then(setTaxCategories);
+  }, []);
 
   useEffect(() => {
     if (currentBusiness) {
       setName(currentBusiness.name);
       setRepresentativeName(currentBusiness.representativeName ?? "");
       setTaxationType(currentBusiness.taxationType);
+      setSimplifiedTaxCategory(currentBusiness.simplifiedTaxCategory);
       setBlueReturnDeduction(currentBusiness.blueReturnDeduction);
     }
   }, [currentBusiness]);
@@ -56,7 +63,7 @@ export default function Settings() {
     if (!currentBusiness) return;
     setSaving(true);
     try {
-      await api.updateBusiness(currentBusiness.id, { name, representativeName, taxationType, blueReturnDeduction });
+      await api.updateBusiness(currentBusiness.id, { name, representativeName, taxationType, simplifiedTaxCategory, blueReturnDeduction });
       await refresh();
       toast.success("設定を保存しました");
     } catch (e) {
@@ -146,6 +153,23 @@ export default function Settings() {
               <option value="SIMPLIFIED">簡易課税</option>
             </select>
           </div>
+          {taxationType === "SIMPLIFIED" && (
+            <div>
+              <label className={labelClass}>簡易課税の事業区分</label>
+              <select
+                className={`${selectClass} w-full`}
+                value={simplifiedTaxCategory}
+                onChange={(e) => setSimplifiedTaxCategory(Number(e.target.value))}
+              >
+                {taxCategories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}(みなし仕入率{(c.rate * 100).toFixed(0)}%)
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-400 mt-1">「消費税申告書」画面のみなし仕入税額の計算に使われます。</p>
+            </div>
+          )}
           {currentBusiness.type === "INDIVIDUAL" && (
             <div>
               <label className={labelClass}>青色申告特別控除額</label>

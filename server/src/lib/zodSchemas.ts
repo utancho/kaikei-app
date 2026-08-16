@@ -27,6 +27,7 @@ export const businessInputSchema = z.object({
   address: z.string().optional(),
   fiscalYearStartMonth: z.number().int().min(1).max(12).optional(),
   taxationType: z.enum(TAXATION_TYPES).optional(),
+  simplifiedTaxCategory: z.number().int().min(1).max(6).optional(),
   blueReturnDeduction: z.union([z.literal(0), z.literal(100000), z.literal(550000), z.literal(650000)]).optional(),
 });
 

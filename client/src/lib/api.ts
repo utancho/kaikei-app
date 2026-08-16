@@ -7,6 +7,7 @@ import type {
   BankTransactionRow,
   BlueReturnStatement,
   Business,
+  ConsumptionTaxReturn,
   FiscalYear,
   FixedAsset,
   GeneralLedger,
@@ -17,6 +18,7 @@ import type {
   Partner,
   PartnerBalancesResponse,
   ProfitLoss,
+  SimplifiedTaxCategory,
   SubscriptionStatus,
   TaxCategory,
   TrialBalanceRow,
@@ -222,6 +224,11 @@ export const api = {
   // Blue return statement (青色申告決算書)
   getBlueReturn: (businessId: string, from?: string, to?: string) =>
     request<BlueReturnStatement>(`/reports/blue-return${qs({ businessId, from, to })}`),
+
+  // Consumption tax return (消費税申告書)
+  getConsumptionTax: (businessId: string, from?: string, to?: string) =>
+    request<ConsumptionTaxReturn>(`/reports/consumption-tax${qs({ businessId, from, to })}`),
+  getSimplifiedTaxCategories: () => request<SimplifiedTaxCategory[]>("/reports/consumption-tax/categories"),
 
   // Admin
   adminListUsers: () => request<AdminUser[]>("/admin/users"),
