@@ -7,6 +7,8 @@ import type {
   BankTransactionRow,
   BlueReturnStatement,
   Business,
+  BusinessMemberInfo,
+  BusinessMembersResponse,
   BudgetActualResponse,
   CashFlowForecast,
   ConsumptionTaxReturn,
@@ -99,6 +101,11 @@ export const api = {
     request<Business>(`/businesses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   listFiscalYears: (businessId: string) =>
     request<FiscalYear[]>(`/businesses/${businessId}/fiscal-years`),
+  listMembers: (businessId: string) => request<BusinessMembersResponse>(`/businesses/${businessId}/members`),
+  inviteMember: (businessId: string, email: string) =>
+    request<BusinessMemberInfo>(`/businesses/${businessId}/members`, { method: "POST", body: JSON.stringify({ email }) }),
+  removeMember: (businessId: string, memberId: string) =>
+    request<void>(`/businesses/${businessId}/members/${memberId}`, { method: "DELETE" }),
 
   // Accounts
   listAccounts: (businessId: string, includeInactive = false) =>

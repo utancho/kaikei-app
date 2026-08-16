@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { runWithPrisma } from "./lib/prisma.js";
 import { errorHandler } from "./middleware/errorHandler.js";
-import { requireActiveSubscription, requireAdmin, requireAuth, verifyBusinessOwnership } from "./middleware/auth.js";
+import { requireActiveSubscription, requireAdmin, requireAuth, verifyBusinessAccess } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
 import { adminRouter } from "./routes/admin.js";
 import { billingRouter, webhookRouter } from "./routes/billing.js";
@@ -45,15 +45,15 @@ app.route("/api/billing/webhook", webhookRouter);
 app.use("/api/billing/*", requireAuth);
 app.route("/api/billing", billingRouter);
 
-const businessScoped = [requireAuth, requireActiveSubscription, verifyBusinessOwnership] as const;
+const businessScoped = [requireAuth, verifyBusinessAccess, requireActiveSubscription] as const;
 
-app.use("/api/businesses/*", requireAuth, requireActiveSubscription);
+app.use("/api/businesses/*", requireAuth);
 app.route("/api/businesses", businessRouter);
 
 app.use("/api/accounts/*", ...businessScoped);
 app.route("/api/accounts", accountsRouter);
 
-app.use("/api/tax-categories/*", requireAuth, requireActiveSubscription);
+app.use("/api/tax-categories/*", requireAuth);
 app.route("/api/tax-categories", taxCategoriesRouter);
 
 app.use("/api/partners/*", ...businessScoped);

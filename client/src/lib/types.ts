@@ -14,6 +14,21 @@ export interface Business {
   taxationType: string;
   simplifiedTaxCategory: number;
   blueReturnDeduction: number;
+  isOwner?: boolean;
+}
+
+export interface BusinessMemberInfo {
+  id: string;
+  email: string;
+  status: "PENDING" | "ACTIVE";
+  role: string;
+  invitedAt: string;
+  joinedAt: string | null;
+}
+
+export interface BusinessMembersResponse {
+  owner: { id: string; email: string; name: string | null } | null;
+  members: BusinessMemberInfo[];
 }
 
 export interface FiscalYear {

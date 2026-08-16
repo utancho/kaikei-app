@@ -1,13 +1,15 @@
 import { useEffect, useState } from "react";
-import { Plus, Building2, CreditCard } from "lucide-react";
+import { Plus, Building2, CreditCard, Users, Trash2, Mail } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { useAuth } from "../context/AuthContext";
 import { api, ApiError } from "../lib/api";
-import type { BusinessType } from "../lib/types";
+import type { BusinessType, BusinessMembersResponse } from "../lib/types";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
 import { useToast } from "../components/ui/Toast";
+import { useConfirm } from "../components/ui/ConfirmDialog";
 import { inputClass, selectClass, labelClass } from "../lib/formStyles";
 
 const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
@@ -22,7 +24,47 @@ export default function Settings() {
   const { currentBusiness, businesses, refresh, setCurrentBusinessId } = useBusiness();
   const { user, subscription } = useAuth();
   const toast = useToast();
+  const confirm = useConfirm();
   const [portalLoading, setPortalLoading] = useState(false);
+
+  const [members, setMembers] = useState<BusinessMembersResponse | null>(null);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviting, setInviting] = useState(false);
+
+  const loadMembers = () => {
+    if (!currentBusiness) return;
+    api.listMembers(currentBusiness.id).then(setMembers);
+  };
+
+  useEffect(loadMembers, [currentBusiness]);
+
+  const handleInvite = async () => {
+    if (!currentBusiness || !inviteEmail) return;
+    setInviting(true);
+    try {
+      await api.inviteMember(currentBusiness.id, inviteEmail);
+      toast.success(`${inviteEmail} を招待しました`);
+      setInviteEmail("");
+      loadMembers();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "招待に失敗しました");
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleRemoveMember = async (memberId: string, email: string) => {
+    if (!currentBusiness) return;
+    const ok = await confirm({ title: `${email} をメンバーから削除しますか?`, danger: true, confirmLabel: "削除する" });
+    if (!ok) return;
+    try {
+      await api.removeMember(currentBusiness.id, memberId);
+      toast.success("メンバーを削除しました");
+      loadMembers();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "削除に失敗しました");
+    }
+  };
 
   const handleOpenPortal = async () => {
     setPortalLoading(true);
@@ -185,6 +227,59 @@ export default function Settings() {
           <Button loading={saving} onClick={handleSaveExisting}>
             保存
           </Button>
+        </Card>
+      )}
+
+      {currentBusiness && members && (
+        <Card className="p-5 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Users size={16} className="text-gray-400" />
+            <h2 className="font-semibold text-sm text-gray-800">メンバー</h2>
+          </div>
+
+          <div className="divide-y divide-gray-100">
+            <div className="flex items-center justify-between py-2">
+              <div className="text-sm text-gray-700">
+                {members.owner?.email}
+                <span className="text-xs text-gray-400 ml-1">{members.owner?.name}</span>
+              </div>
+              <Badge tone="blue">オーナー</Badge>
+            </div>
+            {members.members.map((m) => (
+              <div key={m.id} className="flex items-center justify-between py-2">
+                <div className="text-sm text-gray-700">{m.email}</div>
+                <div className="flex items-center gap-2">
+                  <Badge tone={m.status === "ACTIVE" ? "green" : "yellow"}>{m.status === "ACTIVE" ? "参加済み" : "招待中"}</Badge>
+                  {currentBusiness.isOwner && (
+                    <button className="text-gray-400 hover:text-red-600" onClick={() => handleRemoveMember(m.id, m.email)}>
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+            {members.members.length === 0 && <div className="py-2 text-sm text-gray-400">まだメンバーはいません</div>}
+          </div>
+
+          {currentBusiness.isOwner && (
+            <div className="flex items-center gap-2 pt-2">
+              <div className="relative flex-1">
+                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  className={`${inputClass} pl-8 w-full`}
+                  placeholder="招待するメールアドレス"
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                />
+              </div>
+              <Button size="sm" loading={inviting} onClick={handleInvite} disabled={!inviteEmail}>
+                招待
+              </Button>
+            </div>
+          )}
+          <p className="text-xs text-gray-400">
+            招待されたメンバーはオーナーの契約プランで、この事業者の記帳・請求書・レポート機能を利用できます(事業者設定の変更・メンバー管理はオーナーのみ)。
+          </p>
         </Card>
       )}
 

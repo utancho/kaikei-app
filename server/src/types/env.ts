@@ -10,6 +10,7 @@ export interface Bindings {
 
 export interface Variables {
   userId: string;
+  business?: { id: string; ownerId: string };
 }
 
 export interface AppEnv {

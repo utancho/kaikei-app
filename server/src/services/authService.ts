@@ -1,6 +1,7 @@
 import { prisma } from "../lib/prisma.js";
 import { badRequest } from "../lib/httpError.js";
 import { hashPassword, signToken, verifyPassword } from "../lib/auth.js";
+import { activatePendingInvites } from "./memberService.js";
 
 function sanitizeUser(user: { id: string; email: string; name: string | null; role: string }) {
   return { id: user.id, email: user.email, name: user.name, role: user.role };
@@ -21,6 +22,8 @@ export async function signup(email: string, password: string, jwtSecret: string,
       subscription: { create: { status: "NONE" } },
     },
   });
+
+  await activatePendingInvites(user.id, user.email);
 
   const token = await signToken({ userId: user.id }, jwtSecret);
   return { user: sanitizeUser(user), token };

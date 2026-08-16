@@ -24,6 +24,7 @@ model User {
 
   businesses   Business[]
   subscription Subscription?
+  memberships  BusinessMember[]
 }
 
 model Subscription {
@@ -67,6 +68,7 @@ model Business {
   fixedAssets     FixedAsset[]
   entryTemplates  JournalEntryTemplate[]
   budgets         Budget[]
+  members         BusinessMember[]
 
   @@index([ownerId])
 }
@@ -128,6 +130,22 @@ model Budget {
 
   @@unique([accountId, year, month])
   @@index([businessId, year])
+}
+
+model BusinessMember {
+  id         String    @id @default(cuid())
+  businessId String
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  userId     String? // 招待したメールに一致するアカウントがまだ無い間はnull
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  email      String // 招待先メールアドレス(このメールで後からサインアップした際に自動で紐付ける)
+  role       String    @default("MEMBER") // MEMBER のみ(将来の拡張余地として保持)
+  status     String    @default("PENDING") // PENDING(未参加) | ACTIVE(参加済み)
+  invitedAt  DateTime  @default(now())
+  joinedAt   DateTime?
+
+  @@unique([businessId, email])
+  @@index([userId])
 }
 
 model SubAccount {
