@@ -1,0 +1,39 @@
+{
+  "name": "kaikei-desktop",
+  "productName": "Kaikei",
+  "private": true,
+  "version": "0.1.0",
+  "description": "会計ソフト Kaikei のデスクトップ版(Webアプリのラッパー)",
+  "author": "Kaikei",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:mac": "electron-builder --mac",
+    "dist:win": "electron-builder --win",
+    "dist": "electron-builder --mac --win"
+  },
+  "devDependencies": {
+    "electron": "^32.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.kaikei.app",
+    "productName": "Kaikei",
+    "directories": {
+      "output": "release"
+    },
+    "files": ["main.js", "preload.js"],
+    "icon": "build/icon.png",
+    "mac": {
+      "category": "public.app-category.finance",
+      "target": ["dmg"]
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

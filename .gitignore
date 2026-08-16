@@ -9,3 +9,5 @@ build/
 *.tsbuildinfo
 .wrangler/
 ADMIN_LOGIN.txt
+desktop/release/
+!desktop/build/
