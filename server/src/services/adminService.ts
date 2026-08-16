@@ -72,3 +72,38 @@ export async function updateUserSubscription(userId: string, status: string) {
 
   return prisma.subscription.update({ where: { userId }, data: { status } });
 }
+
+const ROLES = new Set(["USER", "ADMIN"]);
+
+export async function updateUserRole(actingUserId: string, targetUserId: string, role: string) {
+  if (!ROLES.has(role)) badRequest("不正な権限です");
+  if (actingUserId === targetUserId && role !== "ADMIN") {
+    badRequest("自分自身の管理者権限は削除できません");
+  }
+
+  const existing = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!existing) notFound("対象ユーザーが見つかりません");
+
+  return prisma.user.update({ where: { id: targetUserId }, data: { role } });
+}
+
+export async function listAllBusinesses() {
+  const businesses = await prisma.business.findMany({
+    orderBy: { createdAt: "desc" },
+    include: {
+      owner: { select: { email: true, name: true } },
+      _count: { select: { members: true, journalEntries: true } },
+    },
+  });
+  return businesses.map((b) => ({
+    id: b.id,
+    name: b.name,
+    type: b.type,
+    taxationType: b.taxationType,
+    ownerEmail: b.owner.email,
+    ownerName: b.owner.name,
+    memberCount: b._count.members,
+    journalEntryCount: b._count.journalEntries,
+    createdAt: b.createdAt,
+  }));
+}

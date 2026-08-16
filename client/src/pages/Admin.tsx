@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle } from "lucide-react";
+import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2 } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatYen } from "../lib/format";
-import type { AdminStats, AdminUser, SubscriptionStatus } from "../lib/types";
+import type { AdminBusiness, AdminStats, AdminUser, SubscriptionStatus } from "../lib/types";
 import { useAuth } from "../context/AuthContext";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
@@ -120,16 +120,18 @@ export default function Admin() {
   const { user, logout } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
+  const [businesses, setBusinesses] = useState<AdminBusiness[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatus | "ALL">("ALL");
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.adminListUsers(), api.adminGetStats()])
-      .then(([u, s]) => {
+    Promise.all([api.adminListUsers(), api.adminGetStats(), api.adminListBusinesses()])
+      .then(([u, s, b]) => {
         setUsers(u);
         setStats(s);
+        setBusinesses(b);
       })
       .catch((e) => toast.error(e instanceof ApiError ? e.message : "読み込みに失敗しました"))
       .finally(() => setLoading(false));
@@ -141,6 +143,21 @@ export default function Admin() {
     try {
       await api.adminUpdateSubscription(userId, status);
       toast.success("契約状況を更新しました");
+      load();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "更新に失敗しました");
+    }
+  };
+
+  const handleRoleToggle = async (target: AdminUser) => {
+    const nextRole = target.role === "ADMIN" ? "USER" : "ADMIN";
+    if (target.id === user?.id && nextRole === "USER") {
+      toast.error("自分自身の管理者権限は削除できません");
+      return;
+    }
+    try {
+      await api.adminUpdateRole(target.id, nextRole);
+      toast.success(nextRole === "ADMIN" ? `${target.email} を管理者にしました` : `${target.email} の管理者権限を外しました`);
       load();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "更新に失敗しました");
@@ -284,7 +301,13 @@ export default function Admin() {
                       <td className="px-4 py-2.5 text-gray-900">{u.email}</td>
                       <td className="px-4 py-2.5 text-gray-500">{u.name ?? "-"}</td>
                       <td className="px-4 py-2.5">
-                        {u.role === "ADMIN" ? <Badge tone="blue">管理者</Badge> : <Badge tone="gray">一般</Badge>}
+                        <button
+                          className="hover:opacity-70"
+                          title={u.role === "ADMIN" ? "クリックで管理者権限を外す" : "クリックで管理者にする"}
+                          onClick={() => handleRoleToggle(u)}
+                        >
+                          {u.role === "ADMIN" ? <Badge tone="blue">管理者</Badge> : <Badge tone="gray">一般</Badge>}
+                        </button>
                       </td>
                       <td className="px-4 py-2.5 text-gray-500">{formatDate(u.createdAt)}</td>
                       <td className="px-4 py-2.5 text-gray-500">
@@ -321,6 +344,49 @@ export default function Admin() {
                           ))}
                         </select>
                       </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+
+        <Card className="overflow-hidden">
+          <div className="px-4 py-2.5 bg-gray-50 font-semibold text-sm text-gray-700 flex items-center gap-1.5">
+            <Building2 size={15} className="text-gray-400" />
+            全事業者({businesses.length})
+          </div>
+          {loading ? (
+            <div className="p-4">
+              <TableSkeleton rows={4} />
+            </div>
+          ) : businesses.length === 0 ? (
+            <EmptyState title="事業者がまだありません" description="ユーザーが事業者を作成するとここに表示されます" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs">
+                  <tr>
+                    <th className="text-left font-medium px-4 py-2.5">事業者名</th>
+                    <th className="text-left font-medium px-4 py-2.5">オーナー</th>
+                    <th className="text-left font-medium px-4 py-2.5">種別</th>
+                    <th className="text-left font-medium px-4 py-2.5">メンバー数</th>
+                    <th className="text-left font-medium px-4 py-2.5">仕訳数</th>
+                    <th className="text-left font-medium px-4 py-2.5">作成日</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {businesses.map((b) => (
+                    <tr key={b.id}>
+                      <td className="px-4 py-2.5 text-gray-900">{b.name}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{b.ownerEmail}</td>
+                      <td className="px-4 py-2.5">
+                        <Badge tone={b.type === "INDIVIDUAL" ? "gray" : "blue"}>{b.type === "INDIVIDUAL" ? "個人" : "法人"}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-500">{b.memberCount}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{b.journalEntryCount}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{formatDate(b.createdAt)}</td>
                     </tr>
                   ))}
                 </tbody>

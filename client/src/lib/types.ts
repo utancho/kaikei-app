@@ -424,3 +424,15 @@ export interface AdminStats {
   corporateBusinessCount: number;
   mrrJpy: number | null;
 }
+
+export interface AdminBusiness {
+  id: string;
+  name: string;
+  type: "INDIVIDUAL" | "CORPORATE";
+  taxationType: string;
+  ownerEmail: string;
+  ownerName: string | null;
+  memberCount: number;
+  journalEntryCount: number;
+  createdAt: string;
+}

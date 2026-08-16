@@ -1,5 +1,6 @@
 import type {
   Account,
+  AdminBusiness,
   AdminStats,
   AdminUser,
   BalanceSheet,
@@ -258,8 +259,11 @@ export const api = {
   // Admin
   adminListUsers: () => request<AdminUser[]>("/admin/users"),
   adminGetStats: () => request<AdminStats>("/admin/stats"),
+  adminListBusinesses: () => request<AdminBusiness[]>("/admin/businesses"),
   adminUpdateSubscription: (userId: string, status: SubscriptionStatus) =>
     request<void>(`/admin/users/${userId}/subscription`, { method: "PATCH", body: JSON.stringify({ status }) }),
+  adminUpdateRole: (userId: string, role: "USER" | "ADMIN") =>
+    request<void>(`/admin/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
 };
 
 export { ApiError };
