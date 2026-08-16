@@ -32,6 +32,7 @@ class ApiError extends Error {
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
+    credentials: "include",
     headers:
       options.body && !(options.body instanceof FormData)
         ? { "Content-Type": "application/json", ...options.headers }
@@ -58,6 +59,29 @@ function qs(params: Record<string, string | undefined>): string {
 }
 
 export const api = {
+  // Auth
+  signup: (email: string, password: string, name?: string) =>
+    request<{ user: { id: string; email: string; name: string | null } }>("/auth/signup", {
+      method: "POST",
+      body: JSON.stringify({ email, password, name }),
+    }),
+  login: (email: string, password: string) =>
+    request<{ user: { id: string; email: string; name: string | null } }>("/auth/login", {
+      method: "POST",
+      body: JSON.stringify({ email, password }),
+    }),
+  logout: () => request<void>("/auth/logout", { method: "POST" }),
+  me: () =>
+    request<{
+      user: { id: string; email: string; name: string | null };
+      subscription: { status: string; currentPeriodEnd: string | null } | null;
+    }>("/auth/me"),
+
+  // Billing
+  getBillingStatus: () => request<{ status: string; currentPeriodEnd: string | null }>("/billing/status"),
+  startCheckout: () => request<{ url: string | null }>("/billing/checkout", { method: "POST" }),
+  openBillingPortal: () => request<{ url: string | null }>("/billing/portal", { method: "POST" }),
+
   // Business
   listBusinesses: () => request<Business[]>("/businesses"),
   createBusiness: (data: Partial<Business>) =>
@@ -72,8 +96,8 @@ export const api = {
     request<Account[]>(`/accounts${qs({ businessId, includeInactive: includeInactive ? "true" : undefined })}`),
   createAccount: (businessId: string, data: Partial<Account>) =>
     request<Account>(`/accounts?businessId=${businessId}`, { method: "POST", body: JSON.stringify(data) }),
-  updateAccount: (id: string, data: Partial<Account> & { isActive?: boolean }) =>
-    request<Account>(`/accounts/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
+  updateAccount: (businessId: string, id: string, data: Partial<Account> & { isActive?: boolean }) =>
+    request<Account>(`/accounts/${id}?businessId=${businessId}`, { method: "PATCH", body: JSON.stringify(data) }),
 
   listTaxCategories: () => request<TaxCategory[]>("/tax-categories"),
 
@@ -81,9 +105,10 @@ export const api = {
   listPartners: (businessId: string) => request<Partner[]>(`/partners${qs({ businessId })}`),
   createPartner: (businessId: string, data: Partial<Partner>) =>
     request<Partner>(`/partners?businessId=${businessId}`, { method: "POST", body: JSON.stringify(data) }),
-  updatePartner: (id: string, data: Partial<Partner>) =>
-    request<Partner>(`/partners/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
-  deletePartner: (id: string) => request<void>(`/partners/${id}`, { method: "DELETE" }),
+  updatePartner: (businessId: string, id: string, data: Partial<Partner>) =>
+    request<Partner>(`/partners/${id}?businessId=${businessId}`, { method: "PATCH", body: JSON.stringify(data) }),
+  deletePartner: (businessId: string, id: string) =>
+    request<void>(`/partners/${id}?businessId=${businessId}`, { method: "DELETE" }),
 
   // Journal entries
   listJournalEntries: (

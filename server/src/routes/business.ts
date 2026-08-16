@@ -9,8 +9,11 @@ export const businessRouter = Router();
 
 businessRouter.get(
   "/",
-  asyncHandler(async (_req, res) => {
-    const businesses = await prisma.business.findMany({ orderBy: { createdAt: "asc" } });
+  asyncHandler(async (req, res) => {
+    const businesses = await prisma.business.findMany({
+      where: { ownerId: req.userId },
+      orderBy: { createdAt: "asc" },
+    });
     res.json(businesses);
   })
 );
@@ -18,7 +21,7 @@ businessRouter.get(
 businessRouter.get(
   "/:id",
   asyncHandler(async (req, res) => {
-    const business = await prisma.business.findUnique({ where: { id: req.params.id } });
+    const business = await prisma.business.findFirst({ where: { id: req.params.id, ownerId: req.userId } });
     if (!business) notFound("事業者が見つかりません");
     res.json(business);
   })
@@ -28,7 +31,7 @@ businessRouter.post(
   "/",
   asyncHandler(async (req, res) => {
     const input = businessInputSchema.parse(req.body);
-    const { business } = await createBusinessWithDefaults(input);
+    const { business } = await createBusinessWithDefaults(req.userId!, input);
     res.status(201).json(business);
   })
 );
@@ -36,6 +39,8 @@ businessRouter.post(
 businessRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
+    const existing = await prisma.business.findFirst({ where: { id: req.params.id, ownerId: req.userId } });
+    if (!existing) notFound("事業者が見つかりません");
     const input = businessInputSchema.partial().parse(req.body);
     const business = await prisma.business.update({
       where: { id: req.params.id },
@@ -48,6 +53,8 @@ businessRouter.patch(
 businessRouter.get(
   "/:id/fiscal-years",
   asyncHandler(async (req, res) => {
+    const existing = await prisma.business.findFirst({ where: { id: req.params.id, ownerId: req.userId } });
+    if (!existing) notFound("事業者が見つかりません");
     const fiscalYears = await prisma.fiscalYear.findMany({
       where: { businessId: req.params.id },
       orderBy: { startDate: "desc" },

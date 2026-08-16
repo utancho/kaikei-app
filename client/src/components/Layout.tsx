@@ -18,9 +18,11 @@ import {
   FileBadge,
   Contact,
   BarChart3,
+  LogOut,
 } from "lucide-react";
 import { useState } from "react";
 import { useBusiness } from "../context/BusinessContext";
+import { useAuth } from "../context/AuthContext";
 
 const NAV_ITEMS = [
   { to: "/", label: "ダッシュボード", end: true, icon: LayoutDashboard },
@@ -43,7 +45,9 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const { businesses, currentBusiness, setCurrentBusinessId } = useBusiness();
+  const { user, logout } = useAuth();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const navItems = NAV_ITEMS.filter((item) => !item.individualOnly || currentBusiness?.type === "INDIVIDUAL");
 
   return (
@@ -123,6 +127,29 @@ export function Layout() {
               )}
             </div>
           )}
+          <div className="relative ml-3">
+            <button
+              className="w-8 h-8 rounded-full bg-brand-100 text-brand-700 text-sm font-semibold flex items-center justify-center hover:bg-brand-200"
+              onClick={() => setUserMenuOpen((v) => !v)}
+              title={user?.email}
+            >
+              {(user?.name || user?.email || "?").charAt(0).toUpperCase()}
+            </button>
+            {userMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
+                <div className="absolute right-0 mt-1 w-48 bg-white border rounded-lg shadow-lg z-20 py-1">
+                  <div className="px-3 py-2 text-xs text-gray-400 truncate border-b border-gray-100">{user?.email}</div>
+                  <button
+                    className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                    onClick={() => logout()}
+                  >
+                    <LogOut size={14} /> ログアウト
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </header>
         <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
           <Outlet />

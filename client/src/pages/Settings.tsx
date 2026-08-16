@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Plus, Building2 } from "lucide-react";
+import { Plus, Building2, CreditCard } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
+import { useAuth } from "../context/AuthContext";
 import { api, ApiError } from "../lib/api";
 import type { BusinessType } from "../lib/types";
 import { PageHeader } from "../components/ui/PageHeader";
@@ -9,9 +10,32 @@ import { Button } from "../components/ui/Button";
 import { useToast } from "../components/ui/Toast";
 import { inputClass, selectClass, labelClass } from "../lib/formStyles";
 
+const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  TRIALING: "無料お試し期間中",
+  ACTIVE: "利用中",
+  PAST_DUE: "お支払いに問題があります",
+  CANCELED: "解約済み",
+  NONE: "未登録",
+};
+
 export default function Settings() {
   const { currentBusiness, businesses, refresh, setCurrentBusinessId } = useBusiness();
+  const { user, subscription } = useAuth();
   const toast = useToast();
+  const [portalLoading, setPortalLoading] = useState(false);
+
+  const handleOpenPortal = async () => {
+    setPortalLoading(true);
+    try {
+      const { url } = await api.openBillingPortal();
+      if (url) window.location.href = url;
+      else toast.error("課金ポータルを開けませんでした");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "課金ポータルを開けませんでした");
+    } finally {
+      setPortalLoading(false);
+    }
+  };
 
   const [name, setName] = useState("");
   const [representativeName, setRepresentativeName] = useState("");
@@ -75,6 +99,20 @@ export default function Settings() {
   return (
     <div className="space-y-5 max-w-2xl">
       <PageHeader title="設定" />
+
+      <Card className="p-5 space-y-3">
+        <div className="flex items-center gap-2 mb-1">
+          <CreditCard size={16} className="text-gray-400" />
+          <h2 className="font-semibold text-sm text-gray-800">アカウント・お支払い</h2>
+        </div>
+        <div className="text-sm text-gray-600">{user?.email}</div>
+        <div className="text-sm text-gray-500">
+          プラン状況: <span className="font-medium text-gray-800">{SUBSCRIPTION_STATUS_LABELS[subscription?.status ?? "NONE"]}</span>
+        </div>
+        <Button variant="secondary" size="sm" loading={portalLoading} onClick={handleOpenPortal}>
+          お支払い方法・プランを管理
+        </Button>
+      </Card>
 
       {currentBusiness && (
         <Card className="p-5 space-y-4">

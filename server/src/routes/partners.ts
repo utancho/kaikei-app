@@ -34,7 +34,8 @@ partnersRouter.post(
 partnersRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
-    const existing = await prisma.partner.findUnique({ where: { id: req.params.id } });
+    const businessId = requireBusinessId(req);
+    const existing = await prisma.partner.findFirst({ where: { id: req.params.id, businessId } });
     if (!existing) notFound("取引先が見つかりません");
     const input = partnerInputSchema.partial().parse(req.body);
     const partner = await prisma.partner.update({
@@ -48,7 +49,8 @@ partnersRouter.patch(
 partnersRouter.delete(
   "/:id",
   asyncHandler(async (req, res) => {
-    const existing = await prisma.partner.findUnique({ where: { id: req.params.id } });
+    const businessId = requireBusinessId(req);
+    const existing = await prisma.partner.findFirst({ where: { id: req.params.id, businessId } });
     if (!existing) notFound("取引先が見つかりません");
     await prisma.partner.delete({ where: { id: req.params.id } });
     res.status(204).send();

@@ -39,11 +39,12 @@ export interface CreateBusinessInput {
   taxationType?: TaxationType;
 }
 
-export async function createBusinessWithDefaults(input: CreateBusinessInput) {
+export async function createBusinessWithDefaults(ownerId: string, input: CreateBusinessInput) {
   await ensureTaxCategoriesSeeded();
 
   const business = await prisma.business.create({
     data: {
+      ownerId,
       name: input.name,
       type: input.type,
       representativeName: input.representativeName,

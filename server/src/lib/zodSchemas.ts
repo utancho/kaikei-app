@@ -8,6 +8,17 @@ import {
   TAXATION_TYPES,
 } from "./enums.js";
 
+export const signupInputSchema = z.object({
+  email: z.string().email("有効なメールアドレスを入力してください"),
+  password: z.string().min(8, "パスワードは8文字以上で入力してください"),
+  name: z.string().optional(),
+});
+
+export const loginInputSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
+
 export const businessInputSchema = z.object({
   name: z.string().min(1, "屋号/会社名を入力してください"),
   type: z.enum(BUSINESS_TYPES),

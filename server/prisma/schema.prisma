@@ -12,10 +12,39 @@ datasource db {
 // src/lib/enums.ts + zod schemas at the API boundary.
 
 // ---------------------------------------------------------------------------
+// アカウント(ログインユーザー)・課金
+// ---------------------------------------------------------------------------
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  name         String?
+  createdAt    DateTime @default(now())
+
+  businesses   Business[]
+  subscription Subscription?
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  status               String    @default("NONE") // NONE | TRIALING | ACTIVE | PAST_DUE | CANCELED
+  priceId              String?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+// ---------------------------------------------------------------------------
 // 事業者 (会社 or 個人事業主)
 // ---------------------------------------------------------------------------
 model Business {
   id                    String   @id @default(cuid())
+  ownerId               String
+  owner                 User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name                  String // 屋号 or 会社名
   type                  String   @default("INDIVIDUAL") // INDIVIDUAL | CORPORATE
   representativeName    String?
@@ -35,6 +64,8 @@ model Business {
   importBatches   BankImportBatch[]
   fixedAssets     FixedAsset[]
   entryTemplates  JournalEntryTemplate[]
+
+  @@index([ownerId])
 }
 
 // ---------------------------------------------------------------------------

@@ -1,14 +1,29 @@
 import { prisma } from "../src/lib/prisma.js";
 import { createBusinessWithDefaults } from "../src/services/businessService.js";
+import { hashPassword } from "../src/lib/auth.js";
+
+const DEMO_EMAIL = "demo@example.com";
+const DEMO_PASSWORD = "password123";
 
 async function main() {
-  const existing = await prisma.business.findFirst();
+  const existing = await prisma.user.findUnique({ where: { email: DEMO_EMAIL } });
   if (existing) {
-    console.log("Business already exists, skipping seed:", existing.name);
+    console.log("Demo user already exists, skipping seed:", existing.email);
     return;
   }
 
-  const { business, fiscalYear } = await createBusinessWithDefaults({
+  const passwordHash = await hashPassword(DEMO_PASSWORD);
+  const user = await prisma.user.create({
+    data: {
+      email: DEMO_EMAIL,
+      passwordHash,
+      name: "山田 太郎",
+      subscription: { create: { status: "TRIALING" } },
+    },
+  });
+  console.log(`Demo login: ${DEMO_EMAIL} / ${DEMO_PASSWORD}`);
+
+  const { business, fiscalYear } = await createBusinessWithDefaults(user.id, {
     name: "サンプル商店",
     type: "INDIVIDUAL",
     representativeName: "山田 太郎",

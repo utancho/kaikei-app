@@ -1,6 +1,12 @@
 import { Navigate, Route, Routes } from "react-router-dom";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BusinessProvider, useBusiness } from "./context/BusinessContext";
 import { Layout } from "./components/Layout";
+import Landing from "./pages/Landing";
+import Login from "./pages/Login";
+import Signup from "./pages/Signup";
+import Billing from "./pages/Billing";
+import BillingSuccess from "./pages/BillingSuccess";
 import Dashboard from "./pages/Dashboard";
 import JournalEntries from "./pages/JournalEntries";
 import JournalEntryForm from "./pages/JournalEntryForm";
@@ -23,7 +29,7 @@ import BlueReturnPrint from "./pages/BlueReturnPrint";
 import PartnerBalances from "./pages/PartnerBalances";
 import MonthlyTrend from "./pages/MonthlyTrend";
 
-function AppRoutes() {
+function WorkspaceRoutes() {
   const { loading, currentBusiness } = useBusiness();
 
   if (loading) {
@@ -63,10 +69,43 @@ function AppRoutes() {
   );
 }
 
-export default function App() {
+function AppRoutes() {
+  const { user, loading, isSubscriptionActive } = useAuth();
+
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
+  }
+
+  if (!user) {
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="*" element={<Landing />} />
+      </Routes>
+    );
+  }
+
+  if (!isSubscriptionActive) {
+    return (
+      <Routes>
+        <Route path="/billing/success" element={<BillingSuccess />} />
+        <Route path="*" element={<Billing />} />
+      </Routes>
+    );
+  }
+
   return (
     <BusinessProvider>
-      <AppRoutes />
+      <WorkspaceRoutes />
     </BusinessProvider>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppRoutes />
+    </AuthProvider>
   );
 }

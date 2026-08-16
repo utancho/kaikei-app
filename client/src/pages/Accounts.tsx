@@ -62,7 +62,7 @@ export default function Accounts() {
   };
 
   const toggleActive = async (a: Account) => {
-    await api.updateAccount(a.id, { isActive: !a.isActive });
+    await api.updateAccount(currentBusiness.id, a.id, { isActive: !a.isActive });
     toast.success(a.isActive ? `「${a.name}」を無効化しました` : `「${a.name}」を有効化しました`);
     load();
   };

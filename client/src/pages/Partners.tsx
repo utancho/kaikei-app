@@ -57,7 +57,7 @@ export default function Partners() {
     const ok = await confirm({ title: `「${p.name}」を削除しますか?`, danger: true, confirmLabel: "削除する" });
     if (!ok) return;
     try {
-      await api.deletePartner(p.id);
+      await api.deletePartner(currentBusiness.id, p.id);
       toast.success("取引先を削除しました");
       load();
     } catch (e) {

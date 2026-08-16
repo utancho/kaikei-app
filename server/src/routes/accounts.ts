@@ -52,7 +52,8 @@ accountsRouter.post(
 accountsRouter.patch(
   "/:id",
   asyncHandler(async (req, res) => {
-    const existing = await prisma.account.findUnique({ where: { id: req.params.id } });
+    const businessId = requireBusinessId(req);
+    const existing = await prisma.account.findFirst({ where: { id: req.params.id, businessId } });
     if (!existing) notFound("勘定科目が見つかりません");
     const input = accountInputSchema
       .pick({ name: true, subcategory: true, defaultTaxCategoryId: true })

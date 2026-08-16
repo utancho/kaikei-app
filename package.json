@@ -11,6 +11,9 @@
     "dev:client": "npm run dev --workspace=client",
     "build:server": "npm run build --workspace=server",
     "build:client": "npm run build --workspace=client",
+    "build": "npm run build:client && npm run build:server",
+    "start": "node server/dist/index.js",
+    "deploy:migrate": "prisma migrate deploy --schema=server/prisma/schema.prisma",
     "prisma:migrate": "npm run prisma:migrate --workspace=server",
     "prisma:seed": "npm run prisma:seed --workspace=server"
   }
