@@ -44,15 +44,19 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/desktop-v')
-    permissions:
-      contents: write
     steps:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Publish GitHub Release
+      # kaikei-appは非公開リポジトリのため、GitHub Releasesのダウンロードには
+      # ログイン+アクセス権が必要になってしまう。ビルド済みバイナリだけを
+      # 公開の配布専用リポジトリ(kaikei-releases、ソースコードは含まない)へ公開する。
+      - name: Publish to public releases repo
         uses: softprops/action-gh-release@v2
         with:
+          repository: utancho/kaikei-releases
+          token: ${{ secrets.RELEASES_REPO_TOKEN }}
+          tag_name: ${{ github.ref_name }}
           files: artifacts/**/*.{dmg,exe}
           generate_release_notes: true
