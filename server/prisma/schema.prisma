@@ -66,6 +66,7 @@ model Business {
   importBatches   BankImportBatch[]
   fixedAssets     FixedAsset[]
   entryTemplates  JournalEntryTemplate[]
+  budgets         Budget[]
 
   @@index([ownerId])
 }
@@ -107,9 +108,26 @@ model Account {
   subAccounts   SubAccount[]
   lines         JournalEntryLine[]
   templateLines JournalEntryTemplateLine[]
+  budgets       Budget[]
 
   @@unique([businessId, code])
   @@index([businessId, category])
+}
+
+model Budget {
+  id         String   @id @default(cuid())
+  businessId String
+  business   Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  accountId  String
+  account    Account  @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  year       Int
+  month      Int // 1-12
+  amount     Int // 円
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([accountId, year, month])
+  @@index([businessId, year])
 }
 
 model SubAccount {

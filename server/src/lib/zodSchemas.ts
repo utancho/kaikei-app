@@ -31,6 +31,17 @@ export const businessInputSchema = z.object({
   blueReturnDeduction: z.union([z.literal(0), z.literal(100000), z.literal(550000), z.literal(650000)]).optional(),
 });
 
+export const budgetEntryInputSchema = z.object({
+  accountId: z.string().min(1),
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+  amount: z.number().int().min(0),
+});
+
+export const budgetBulkInputSchema = z.object({
+  entries: z.array(budgetEntryInputSchema).min(1),
+});
+
 export const accountInputSchema = z.object({
   code: z.string().min(1),
   name: z.string().min(1),

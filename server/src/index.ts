@@ -15,6 +15,7 @@ import { invoicesRouter } from "./routes/invoices.js";
 import { bankImportRouter } from "./routes/bankImport.js";
 import { fixedAssetsRouter } from "./routes/fixedAssets.js";
 import { templatesRouter } from "./routes/templates.js";
+import { budgetsRouter } from "./routes/budgets.js";
 import type { AppEnv } from "./types/env.js";
 
 const app = new Hono<AppEnv>();
@@ -75,6 +76,9 @@ app.route("/api/fixed-assets", fixedAssetsRouter);
 
 app.use("/api/templates/*", ...businessScoped);
 app.route("/api/templates", templatesRouter);
+
+app.use("/api/budgets/*", ...businessScoped);
+app.route("/api/budgets", budgetsRouter);
 
 app.use("/api/admin/*", requireAuth, requireAdmin);
 app.route("/api/admin", adminRouter);

@@ -300,6 +300,41 @@ export interface SimplifiedTaxCategory {
   rate: number;
 }
 
+export interface BudgetMonth {
+  month: number;
+  budget: number;
+  actual: number;
+  variance: number;
+}
+
+export interface BudgetActualRow {
+  accountId: string;
+  code: string;
+  name: string;
+  category: "REVENUE" | "EXPENSE";
+  budgetTotal: number;
+  actualTotal: number;
+  months: BudgetMonth[];
+}
+
+export interface BudgetActualResponse {
+  year: number;
+  rows: BudgetActualRow[];
+}
+
+export interface CashFlowForecastPoint {
+  month: string;
+  balance: number;
+  source: "budget" | "trend";
+}
+
+export interface CashFlowForecast {
+  currentBalance: number;
+  history: { month: string; balance: number }[];
+  forecast: CashFlowForecastPoint[];
+  trailingAverageMonthlyChange: number;
+}
+
 export interface PartnerBalance {
   partnerId: string;
   partnerName: string;

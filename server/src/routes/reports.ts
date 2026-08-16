@@ -15,6 +15,7 @@ import {
 import { getOrCreateFiscalYearForDate } from "../services/fiscalYearService.js";
 import { getBlueReturnStatement } from "../services/blueReturnService.js";
 import { getConsumptionTaxReturn, getSimplifiedTaxCategories } from "../services/consumptionTaxService.js";
+import { getCashFlowForecast } from "../services/budgetService.js";
 import type { AppEnv } from "../types/env.js";
 
 export const reportsRouter = new Hono<AppEnv>();
@@ -78,6 +79,12 @@ reportsRouter.get("/consumption-tax", async (c) => {
 
 reportsRouter.get("/consumption-tax/categories", (c) => {
   return c.json(getSimplifiedTaxCategories());
+});
+
+reportsRouter.get("/cash-flow-forecast", async (c) => {
+  const businessId = requireBusinessId(c);
+  const months = Math.min(Math.max(Number(c.req.query("months")) || 6, 1), 12);
+  return c.json(await getCashFlowForecast(businessId, months));
 });
 
 reportsRouter.get("/partner-balances", async (c) => {

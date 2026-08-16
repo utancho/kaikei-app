@@ -7,6 +7,8 @@ import type {
   BankTransactionRow,
   BlueReturnStatement,
   Business,
+  BudgetActualResponse,
+  CashFlowForecast,
   ConsumptionTaxReturn,
   FiscalYear,
   FixedAsset,
@@ -229,6 +231,14 @@ export const api = {
   getConsumptionTax: (businessId: string, from?: string, to?: string) =>
     request<ConsumptionTaxReturn>(`/reports/consumption-tax${qs({ businessId, from, to })}`),
   getSimplifiedTaxCategories: () => request<SimplifiedTaxCategory[]>("/reports/consumption-tax/categories"),
+
+  // Budget vs actual / cash flow forecast
+  getBudgetActual: (businessId: string, year: number) =>
+    request<BudgetActualResponse>(`/budgets/actual${qs({ businessId, year: String(year) })}`),
+  saveBudgets: (businessId: string, entries: { accountId: string; year: number; month: number; amount: number }[]) =>
+    request<void>(`/budgets${qs({ businessId })}`, { method: "PUT", body: JSON.stringify({ entries }) }),
+  getCashFlowForecast: (businessId: string, months = 6) =>
+    request<CashFlowForecast>(`/reports/cash-flow-forecast${qs({ businessId, months: String(months) })}`),
 
   // Admin
   adminListUsers: () => request<AdminUser[]>("/admin/users"),

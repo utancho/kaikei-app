@@ -27,6 +27,8 @@ import JournalEntryTemplates from "./pages/JournalEntryTemplates";
 import BlueReturn from "./pages/BlueReturn";
 import BlueReturnPrint from "./pages/BlueReturnPrint";
 import ConsumptionTax from "./pages/ConsumptionTax";
+import Budget from "./pages/Budget";
+import CashFlowForecast from "./pages/CashFlowForecast";
 import PartnerBalances from "./pages/PartnerBalances";
 import MonthlyTrend from "./pages/MonthlyTrend";
 import Admin from "./pages/Admin";
@@ -77,6 +79,8 @@ function WorkspaceRoutes() {
         <Route path="/journal-entry-templates" element={<JournalEntryTemplates />} />
         <Route path="/reports/blue-return" element={<BlueReturn />} />
         <Route path="/reports/consumption-tax" element={<ConsumptionTax />} />
+        <Route path="/budget" element={<Budget />} />
+        <Route path="/reports/cash-flow-forecast" element={<CashFlowForecast />} />
         <Route path="/reports/monthly-trend" element={<MonthlyTrend />} />
         <Route path="/reports/partner-balances" element={<PartnerBalances />} />
         <Route path="/settings" element={<Settings />} />
