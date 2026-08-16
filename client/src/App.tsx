@@ -29,6 +29,19 @@ import BlueReturnPrint from "./pages/BlueReturnPrint";
 import PartnerBalances from "./pages/PartnerBalances";
 import MonthlyTrend from "./pages/MonthlyTrend";
 import Admin from "./pages/Admin";
+import CommercialTransactions from "./pages/legal/CommercialTransactions";
+import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
+import TermsOfService from "./pages/legal/TermsOfService";
+
+function LegalRoutes() {
+  return (
+    <>
+      <Route path="/legal/tokushoho" element={<CommercialTransactions />} />
+      <Route path="/legal/privacy" element={<PrivacyPolicy />} />
+      <Route path="/legal/terms" element={<TermsOfService />} />
+    </>
+  );
+}
 
 function WorkspaceRoutes() {
   const { loading, currentBusiness } = useBusiness();
@@ -45,6 +58,7 @@ function WorkspaceRoutes() {
     <Routes>
       <Route path="/invoices/:id/print" element={<InvoicePrint />} />
       <Route path="/reports/blue-return/print" element={<BlueReturnPrint />} />
+      {LegalRoutes()}
       <Route element={<Layout />}>
         <Route path="/" element={<Dashboard />} />
         <Route path="/journal-entries" element={<JournalEntries />} />
@@ -83,6 +97,7 @@ function AppRoutes() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        {LegalRoutes()}
         <Route path="*" element={<Landing />} />
       </Routes>
     );
@@ -100,6 +115,7 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/billing/success" element={<BillingSuccess />} />
+        {LegalRoutes()}
         <Route path="*" element={<Billing />} />
       </Routes>
     );

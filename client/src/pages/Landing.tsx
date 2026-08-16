@@ -206,8 +206,19 @@ export default function Landing() {
       </section>
 
       <footer className="border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-6 flex items-center justify-between text-sm text-gray-400">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
           <span>&copy; {new Date().getFullYear()} Kaikei</span>
+          <nav className="flex items-center gap-5">
+            <Link to="/legal/tokushoho" className="hover:text-gray-600">
+              特定商取引法に基づく表示
+            </Link>
+            <Link to="/legal/privacy" className="hover:text-gray-600">
+              プライバシーポリシー
+            </Link>
+            <Link to="/legal/terms" className="hover:text-gray-600">
+              利用規約
+            </Link>
+          </nav>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded bg-brand-600 flex items-center justify-center">
               <Wallet size={14} className="text-white" />
