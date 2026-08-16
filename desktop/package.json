@@ -26,10 +26,12 @@
     "icon": "build/icon.png",
     "mac": {
       "category": "public.app-category.finance",
-      "target": [{ "target": "dmg", "arch": ["universal"] }]
+      "target": [{ "target": "dmg", "arch": ["universal"] }],
+      "artifactName": "Kaikei.dmg"
     },
     "win": {
-      "target": ["nsis"]
+      "target": ["nsis"],
+      "artifactName": "Kaikei-Setup.exe"
     },
     "nsis": {
       "oneClick": false,

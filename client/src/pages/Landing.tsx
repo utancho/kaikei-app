@@ -9,8 +9,13 @@ import {
   BarChart3,
   CheckCircle2,
   ArrowRight,
+  Download,
+  Apple,
+  MonitorDown,
 } from "lucide-react";
 import { Button } from "../components/ui/Button";
+
+const RELEASES_BASE = "https://github.com/utancho/kaikei-releases/releases/latest/download";
 
 const FEATURES = [
   {
@@ -111,6 +116,29 @@ export default function Landing() {
           </Link>
         </div>
         <p className="text-xs text-gray-400 mt-4">クレジットカード登録は無料期間終了前でOK</p>
+      </section>
+
+      <section className="max-w-4xl mx-auto px-6 pb-16">
+        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 sm:p-8 text-center">
+          <h2 className="text-lg font-semibold text-gray-900 mb-1">デスクトップアプリもあります</h2>
+          <p className="text-sm text-gray-500 mb-6">ブラウザ不要。Mac / Windows にインストールしてすぐ使えます。</p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a href={`${RELEASES_BASE}/Kaikei.dmg`}>
+              <Button variant="secondary" icon={<Apple size={16} />} className="px-5 py-2.5">
+                Macでダウンロード
+              </Button>
+            </a>
+            <a href={`${RELEASES_BASE}/Kaikei-Setup.exe`}>
+              <Button variant="secondary" icon={<MonitorDown size={16} />} className="px-5 py-2.5">
+                Windowsでダウンロード
+              </Button>
+            </a>
+          </div>
+          <p className="text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
+            <Download size={12} />
+            初回起動時、未署名アプリの警告が表示される場合があります(詳細から実行できます)
+          </p>
+        </div>
       </section>
 
       <section className="bg-gray-50 py-20">
