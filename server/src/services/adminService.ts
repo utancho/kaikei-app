@@ -7,7 +7,10 @@ const SUBSCRIPTION_STATUSES = new Set(["NONE", "TRIALING", "ACTIVE", "PAST_DUE",
 export async function listUsers() {
   const users = await prisma.user.findMany({
     orderBy: { createdAt: "desc" },
-    include: { subscription: true, businesses: { select: { id: true } } },
+    include: {
+      subscription: true,
+      businesses: { select: { id: true, name: true, type: true }, orderBy: { createdAt: "asc" } },
+    },
   });
   return users.map((u) => ({
     id: u.id,
@@ -15,7 +18,7 @@ export async function listUsers() {
     name: u.name,
     role: u.role,
     createdAt: u.createdAt,
-    businessCount: u.businesses.length,
+    businesses: u.businesses,
     subscription: u.subscription
       ? {
           status: u.subscription.status,
@@ -26,11 +29,16 @@ export async function listUsers() {
 }
 
 export async function getStats(stripe: Stripe | null, priceId: string | undefined) {
-  const [totalUsers, activeCount, trialingCount] = await Promise.all([
-    prisma.user.count(),
-    prisma.subscription.count({ where: { status: "ACTIVE" } }),
-    prisma.subscription.count({ where: { status: "TRIALING" } }),
-  ]);
+  const [totalUsers, activeCount, trialingCount, pastDueCount, canceledCount, individualCount, corporateCount] =
+    await Promise.all([
+      prisma.user.count(),
+      prisma.subscription.count({ where: { status: "ACTIVE" } }),
+      prisma.subscription.count({ where: { status: "TRIALING" } }),
+      prisma.subscription.count({ where: { status: "PAST_DUE" } }),
+      prisma.subscription.count({ where: { status: "CANCELED" } }),
+      prisma.business.count({ where: { type: "INDIVIDUAL" } }),
+      prisma.business.count({ where: { type: "CORPORATE" } }),
+    ]);
 
   let mrrJpy: number | null = null;
   if (stripe && priceId) {
@@ -44,7 +52,16 @@ export async function getStats(stripe: Stripe | null, priceId: string | undefine
     }
   }
 
-  return { totalUsers, activeCount, trialingCount, mrrJpy };
+  return {
+    totalUsers,
+    activeCount,
+    trialingCount,
+    pastDueCount,
+    canceledCount,
+    individualBusinessCount: individualCount,
+    corporateBusinessCount: corporateCount,
+    mrrJpy,
+  };
 }
 
 export async function updateUserSubscription(userId: string, status: string) {

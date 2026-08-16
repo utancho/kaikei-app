@@ -312,7 +312,7 @@ export interface AdminUser {
   name: string | null;
   role: string;
   createdAt: string;
-  businessCount: number;
+  businesses: { id: string; name: string; type: "INDIVIDUAL" | "CORPORATE" }[];
   subscription: {
     status: SubscriptionStatus;
     currentPeriodEnd: string | null;
@@ -323,5 +323,9 @@ export interface AdminStats {
   totalUsers: number;
   activeCount: number;
   trialingCount: number;
+  pastDueCount: number;
+  canceledCount: number;
+  individualBusinessCount: number;
+  corporateBusinessCount: number;
   mrrJpy: number | null;
 }

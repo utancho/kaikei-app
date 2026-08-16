@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet } from "lucide-react";
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatYen } from "../lib/format";
 import type { AdminStats, AdminUser, SubscriptionStatus } from "../lib/types";
@@ -9,7 +10,8 @@ import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { TableSkeleton } from "../components/ui/Skeleton";
-import { selectClass } from "../lib/formStyles";
+import { EmptyState } from "../components/ui/EmptyState";
+import { inputClass, selectClass } from "../lib/formStyles";
 import { useToast } from "../components/ui/Toast";
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
@@ -29,11 +31,28 @@ const STATUS_TONES: Record<SubscriptionStatus, "gray" | "green" | "yellow" | "re
 };
 
 const STATUS_OPTIONS: SubscriptionStatus[] = ["NONE", "TRIALING", "ACTIVE", "PAST_DUE", "CANCELED"];
+const STATUS_FILTERS: (SubscriptionStatus | "ALL")[] = ["ALL", "TRIALING", "ACTIVE", "PAST_DUE", "CANCELED", "NONE"];
 
-function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+function StatCard({
+  icon,
+  label,
+  value,
+  tone = "default",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+  tone?: "default" | "warning";
+}) {
   return (
     <Card className="p-4 flex items-center gap-3">
-      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-brand-50 text-brand-600">{icon}</div>
+      <div
+        className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${
+          tone === "warning" ? "bg-amber-50 text-amber-600" : "bg-brand-50 text-brand-600"
+        }`}
+      >
+        {icon}
+      </div>
       <div className="min-w-0">
         <div className="text-xs text-gray-500">{label}</div>
         <div className="text-xl font-bold mt-0.5 truncate text-gray-900">{value}</div>
@@ -42,12 +61,68 @@ function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string
   );
 }
 
+function buildSignupSeries(users: AdminUser[]) {
+  if (users.length === 0) return [];
+  const days = 30;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const counts = new Map<string, number>();
+  for (const u of users) {
+    const d = new Date(u.createdAt);
+    d.setHours(0, 0, 0, 0);
+    const key = d.toISOString().slice(0, 10);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const series: { date: string; label: string; count: number; cumulative: number }[] = [];
+  const usersBeforeWindow = users.filter((u) => {
+    const d = new Date(u.createdAt);
+    const diffDays = Math.floor((today.getTime() - d.getTime()) / 86400000);
+    return diffDays >= days;
+  }).length;
+  let cumulative = usersBeforeWindow;
+
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    const count = counts.get(key) ?? 0;
+    cumulative += count;
+    series.push({ date: key, label: `${d.getMonth() + 1}/${d.getDate()}`, count, cumulative });
+  }
+  return series;
+}
+
+function exportUsersCsv(users: AdminUser[]) {
+  const header = ["メールアドレス", "名前", "権限", "登録日", "事業者数", "契約状況"];
+  const rows = users.map((u) => [
+    u.email,
+    u.name ?? "",
+    u.role,
+    formatDate(u.createdAt),
+    String(u.businesses.length),
+    STATUS_LABELS[u.subscription.status],
+  ]);
+  const csv = [header, ...rows]
+    .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(","))
+    .join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `kaikei-users-${new Date().toISOString().slice(0, 10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Admin() {
   const toast = useToast();
   const { user, logout } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<SubscriptionStatus | "ALL">("ALL");
 
   const load = () => {
     setLoading(true);
@@ -72,6 +147,18 @@ export default function Admin() {
     }
   };
 
+  const filteredUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return users.filter((u) => {
+      if (statusFilter !== "ALL" && u.subscription.status !== statusFilter) return false;
+      if (!q) return true;
+      return u.email.toLowerCase().includes(q) || (u.name ?? "").toLowerCase().includes(q);
+    });
+  }, [users, search, statusFilter]);
+
+  const signupSeries = useMemo(() => buildSignupSeries(users), [users]);
+  const newLast30Days = useMemo(() => signupSeries.reduce((sum, d) => sum + d.count, 0), [signupSeries]);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="h-14 bg-brand-900 text-white flex items-center justify-between px-6">
@@ -89,71 +176,158 @@ export default function Admin() {
         </div>
       </header>
       <div className="p-6 space-y-5 max-w-6xl mx-auto">
-        <PageHeader title="管理者ダッシュボード" subtitle="全ユーザーの登録状況と契約状況を確認できます" />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={<Users size={18} />} label="総ユーザー数" value={stats ? String(stats.totalUsers) : "-"} />
-        <StatCard icon={<CircleCheck size={18} />} label="契約中" value={stats ? String(stats.activeCount) : "-"} />
-        <StatCard icon={<Clock size={18} />} label="トライアル中" value={stats ? String(stats.trialingCount) : "-"} />
-        <StatCard
-          icon={<TrendingUp size={18} />}
-          label="MRR(月次経常収益)"
-          value={stats?.mrrJpy != null ? formatYen(stats.mrrJpy) : "未設定"}
+        <PageHeader
+          title="管理者ダッシュボード"
+          subtitle="全ユーザーの登録状況と契約状況を確認できます"
+          action={
+            <button
+              className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-700 bg-white"
+              onClick={() => exportUsersCsv(filteredUsers)}
+              disabled={filteredUsers.length === 0}
+            >
+              <Download size={14} /> CSVエクスポート
+            </button>
+          }
         />
-      </div>
 
-      <Card className="overflow-hidden">
-        {loading ? (
-          <div className="p-4">
-            <TableSkeleton rows={6} />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={<Users size={18} />} label="総ユーザー数" value={stats ? String(stats.totalUsers) : "-"} />
+          <StatCard icon={<CircleCheck size={18} />} label="契約中" value={stats ? String(stats.activeCount) : "-"} />
+          <StatCard icon={<Clock size={18} />} label="トライアル中" value={stats ? String(stats.trialingCount) : "-"} />
+          <StatCard
+            icon={<TrendingUp size={18} />}
+            label="MRR(月次経常収益)"
+            value={stats?.mrrJpy != null ? formatYen(stats.mrrJpy) : "未設定"}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatCard icon={<AlertTriangle size={18} />} label="支払い遅延" value={stats ? String(stats.pastDueCount) : "-"} tone="warning" />
+          <StatCard icon={<XCircle size={18} />} label="解約済み" value={stats ? String(stats.canceledCount) : "-"} />
+          <StatCard
+            icon={<Users size={18} />}
+            label="事業者内訳(個人/法人)"
+            value={stats ? `${stats.individualBusinessCount} / ${stats.corporateBusinessCount}` : "-"}
+          />
+          <StatCard icon={<TrendingUp size={18} />} label="過去30日の新規登録" value={String(newLast30Days)} />
+        </div>
+
+        <Card className="p-4">
+          <div className="text-sm font-semibold text-gray-900 mb-3">登録者数の推移(過去30日・累計)</div>
+          {signupSeries.length === 0 ? (
+            <div className="text-sm text-gray-400 py-8 text-center">データがありません</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={180}>
+              <AreaChart data={signupSeries} margin={{ top: 4, right: 8, left: -20, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="signupGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2f8a70" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#2f8a70" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="label" tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} interval={4} />
+                <YAxis tick={{ fontSize: 11, fill: "#9ca3af" }} axisLine={false} tickLine={false} allowDecimals={false} width={28} />
+                <Tooltip
+                  formatter={(value, name) => [String(value), name === "cumulative" ? "累計ユーザー数" : "新規登録"]}
+                  labelFormatter={(label) => label}
+                  contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                />
+                <Area type="monotone" dataKey="cumulative" stroke="#2f8a70" strokeWidth={2} fill="url(#signupGradient)" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
+        </Card>
+
+        <div className="flex flex-col sm:flex-row gap-3">
+          <div className="relative flex-1">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              className={`${inputClass} pl-9`}
+              placeholder="メールアドレス・名前で検索"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500 text-xs">
-                <tr>
-                  <th className="text-left font-medium px-4 py-2.5">メールアドレス</th>
-                  <th className="text-left font-medium px-4 py-2.5">名前</th>
-                  <th className="text-left font-medium px-4 py-2.5">権限</th>
-                  <th className="text-left font-medium px-4 py-2.5">登録日</th>
-                  <th className="text-left font-medium px-4 py-2.5">事業者数</th>
-                  <th className="text-left font-medium px-4 py-2.5">契約状況</th>
-                  <th className="text-left font-medium px-4 py-2.5">操作</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {users.map((u) => (
-                  <tr key={u.id}>
-                    <td className="px-4 py-2.5 text-gray-900">{u.email}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{u.name ?? "-"}</td>
-                    <td className="px-4 py-2.5">
-                      {u.role === "ADMIN" ? <Badge tone="blue">管理者</Badge> : <Badge tone="gray">一般</Badge>}
-                    </td>
-                    <td className="px-4 py-2.5 text-gray-500">{formatDate(u.createdAt)}</td>
-                    <td className="px-4 py-2.5 text-gray-500">{u.businessCount}</td>
-                    <td className="px-4 py-2.5">
-                      <Badge tone={STATUS_TONES[u.subscription.status]}>{STATUS_LABELS[u.subscription.status]}</Badge>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <select
-                        className={`${selectClass} !py-1 !text-xs w-32`}
-                        value={u.subscription.status}
-                        onChange={(e) => handleStatusChange(u.id, e.target.value as SubscriptionStatus)}
-                      >
-                        {STATUS_OPTIONS.map((s) => (
-                          <option key={s} value={s}>
-                            {STATUS_LABELS[s]}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+          <select className={`${selectClass} sm:w-48`} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as SubscriptionStatus | "ALL")}>
+            {STATUS_FILTERS.map((s) => (
+              <option key={s} value={s}>
+                {s === "ALL" ? "すべての契約状況" : STATUS_LABELS[s]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <Card className="overflow-hidden">
+          {loading ? (
+            <div className="p-4">
+              <TableSkeleton rows={6} />
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <EmptyState title="該当するユーザーがいません" description="検索条件やフィルターを変更してください" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs">
+                  <tr>
+                    <th className="text-left font-medium px-4 py-2.5">メールアドレス</th>
+                    <th className="text-left font-medium px-4 py-2.5">名前</th>
+                    <th className="text-left font-medium px-4 py-2.5">権限</th>
+                    <th className="text-left font-medium px-4 py-2.5">登録日</th>
+                    <th className="text-left font-medium px-4 py-2.5">事業者</th>
+                    <th className="text-left font-medium px-4 py-2.5">契約状況</th>
+                    <th className="text-left font-medium px-4 py-2.5">操作</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Card>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredUsers.map((u) => (
+                    <tr key={u.id}>
+                      <td className="px-4 py-2.5 text-gray-900">{u.email}</td>
+                      <td className="px-4 py-2.5 text-gray-500">{u.name ?? "-"}</td>
+                      <td className="px-4 py-2.5">
+                        {u.role === "ADMIN" ? <Badge tone="blue">管理者</Badge> : <Badge tone="gray">一般</Badge>}
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-500">{formatDate(u.createdAt)}</td>
+                      <td className="px-4 py-2.5 text-gray-500">
+                        {u.businesses.length === 0 ? (
+                          "-"
+                        ) : (
+                          <div className="flex flex-wrap gap-1 max-w-[220px]">
+                            {u.businesses.map((b) => (
+                              <span
+                                key={b.id}
+                                title={b.name}
+                                className="text-[11px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-600 truncate max-w-[100px]"
+                              >
+                                {b.name}
+                                <span className="text-gray-400">{b.type === "INDIVIDUAL" ? "(個)" : "(法)"}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Badge tone={STATUS_TONES[u.subscription.status]}>{STATUS_LABELS[u.subscription.status]}</Badge>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <select
+                          className={`${selectClass} !py-1 !text-xs w-32`}
+                          value={u.subscription.status}
+                          onChange={(e) => handleStatusChange(u.id, e.target.value as SubscriptionStatus)}
+                        >
+                          {STATUS_OPTIONS.map((s) => (
+                            <option key={s} value={s}>
+                              {STATUS_LABELS[s]}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
       </div>
     </div>
   );
