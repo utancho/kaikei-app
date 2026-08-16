@@ -33,6 +33,10 @@ export default function JournalEntryForm() {
   const [searchParams] = useSearchParams();
   const templateId = searchParams.get("templateId");
   const duplicateId = searchParams.get("duplicateId");
+  const receiptDate = searchParams.get("receiptDate");
+  const receiptDescription = searchParams.get("receiptDescription");
+  const receiptAmount = searchParams.get("receiptAmount");
+  const receiptAccountId = searchParams.get("receiptAccountId");
   const isEdit = Boolean(id) && id !== "new";
   const navigate = useNavigate();
   const toast = useToast();
@@ -109,6 +113,16 @@ export default function JournalEntryForm() {
       );
     });
   }, [currentBusiness, isEdit, templateId]);
+
+  useEffect(() => {
+    if (isEdit || duplicateId || templateId || !receiptAmount) return;
+    if (receiptDate) setEntryDate(receiptDate);
+    if (receiptDescription) setDescription(receiptDescription);
+    setLines([
+      { ...emptyLine("DEBIT"), accountId: receiptAccountId ?? "", amount: receiptAmount },
+      { ...emptyLine("CREDIT"), amount: receiptAmount },
+    ]);
+  }, [isEdit, duplicateId, templateId, receiptDate, receiptDescription, receiptAmount, receiptAccountId]);
 
   if (!currentBusiness) return null;
 

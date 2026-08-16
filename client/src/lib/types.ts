@@ -350,6 +350,14 @@ export interface CashFlowForecast {
   trailingAverageMonthlyChange: number;
 }
 
+export interface ReceiptExtraction {
+  date: string | null;
+  vendorName: string | null;
+  amount: number | null;
+  description: string | null;
+  suggestedAccountId: string | null;
+}
+
 export interface PartnerBalance {
   partnerId: string;
   partnerName: string;

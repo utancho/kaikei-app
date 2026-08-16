@@ -22,6 +22,7 @@ import type {
   Partner,
   PartnerBalancesResponse,
   ProfitLoss,
+  ReceiptExtraction,
   SimplifiedTaxCategory,
   SubscriptionStatus,
   TaxCategory,
@@ -246,6 +247,13 @@ export const api = {
     request<void>(`/budgets${qs({ businessId })}`, { method: "PUT", body: JSON.stringify({ entries }) }),
   getCashFlowForecast: (businessId: string, months = 6) =>
     request<CashFlowForecast>(`/reports/cash-flow-forecast${qs({ businessId, months: String(months) })}`),
+
+  // Receipt OCR
+  analyzeReceipt: (businessId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return request<ReceiptExtraction>(`/receipts/analyze?businessId=${businessId}`, { method: "POST", body: form });
+  },
 
   // Admin
   adminListUsers: () => request<AdminUser[]>("/admin/users"),

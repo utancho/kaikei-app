@@ -24,6 +24,10 @@ database_name = "kaikei-db"
 database_id = "e7e8c115-5101-411f-9e37-c4f548948930"
 migrations_dir = "server/migrations"
 
+# レシートOCR(領収書画像からの仕訳提案)用。Cloudflare Workers AIのvisionモデルを使う。
+[ai]
+binding = "AI"
+
 # 本番用の値は Cloudflareダッシュボード / `wrangler secret put` で設定してください。
 # 機密情報(JWT_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET)は
 # [vars] に書かず、必ず `wrangler secret put <NAME>` で設定してください。

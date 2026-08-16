@@ -1,5 +1,6 @@
 export interface Bindings {
   DB: D1Database;
+  AI: Ai;
   JWT_SECRET: string;
   APP_URL: string;
   STRIPE_SECRET_KEY?: string;
