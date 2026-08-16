@@ -4,39 +4,33 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "prisma:migrate": "prisma migrate dev",
+    "dev": "wrangler dev",
+    "build": "tsc -p tsconfig.json --noEmit",
+    "deploy": "wrangler deploy",
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
-    "prisma:studio": "prisma studio"
+    "prisma:studio": "prisma studio",
+    "d1:migrations:apply:local": "wrangler d1 migrations apply kaikei-db --local",
+    "d1:migrations:apply:remote": "wrangler d1 migrations apply kaikei-db --remote"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@prisma/client": "^5.20.0",
+    "@prisma/adapter-d1": "^6.19.3",
+    "@prisma/client": "^6.19.3",
     "bcryptjs": "^3.0.3",
-    "cookie-parser": "^1.4.7",
-    "cors": "^2.8.5",
-    "dotenv": "^17.4.2",
-    "express": "^4.21.0",
-    "jsonwebtoken": "^9.0.3",
-    "multer": "^2.0.0",
-    "prisma": "^5.20.0",
+    "hono": "^4.13.2",
     "stripe": "^22.5.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260702.1",
     "@types/bcryptjs": "^2.4.6",
-    "@types/cookie-parser": "^1.4.10",
-    "@types/cors": "^2.8.17",
-    "@types/express": "^4.17.21",
-    "@types/jsonwebtoken": "^9.0.10",
-    "@types/multer": "^1.4.12",
     "@types/node": "^22.7.4",
+    "prisma": "^6.19.3",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2"
+    "typescript": "^5.6.2",
+    "wrangler": "^4.123.0"
   }
 }

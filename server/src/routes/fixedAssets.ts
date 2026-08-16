@@ -1,5 +1,4 @@
-import { Router } from "express";
-import { asyncHandler } from "../lib/asyncHandler.js";
+import { Hono } from "hono";
 import { requireBusinessId } from "../lib/requestHelpers.js";
 import { fixedAssetInputSchema } from "../lib/zodSchemas.js";
 import { badRequest } from "../lib/httpError.js";
@@ -10,50 +9,36 @@ import {
   listFixedAssets,
   postDepreciationForFiscalYear,
 } from "../services/fixedAssetService.js";
+import type { AppEnv } from "../types/env.js";
 
-export const fixedAssetsRouter = Router();
+export const fixedAssetsRouter = new Hono<AppEnv>();
 
-fixedAssetsRouter.get(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await listFixedAssets(businessId));
-  })
-);
+fixedAssetsRouter.get("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await listFixedAssets(businessId));
+});
 
-fixedAssetsRouter.get(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await getFixedAsset(businessId, req.params.id));
-  })
-);
+fixedAssetsRouter.get("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await getFixedAsset(businessId, c.req.param("id")));
+});
 
-fixedAssetsRouter.post(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const input = fixedAssetInputSchema.parse(req.body);
-    res.status(201).json(await createFixedAsset(businessId, input));
-  })
-);
+fixedAssetsRouter.post("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  const input = fixedAssetInputSchema.parse(await c.req.json());
+  return c.json(await createFixedAsset(businessId, input), 201);
+});
 
-fixedAssetsRouter.delete(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    await deleteFixedAsset(businessId, req.params.id);
-    res.status(204).send();
-  })
-);
+fixedAssetsRouter.delete("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  await deleteFixedAsset(businessId, c.req.param("id"));
+  return c.body(null, 204);
+});
 
-fixedAssetsRouter.post(
-  "/:id/post-depreciation",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const { fiscalYearId } = req.body as { fiscalYearId?: string };
-    if (!fiscalYearId) badRequest("fiscalYearIdを指定してください");
-    const entry = await postDepreciationForFiscalYear(businessId, req.params.id, fiscalYearId!);
-    res.json(entry);
-  })
-);
+fixedAssetsRouter.post("/:id/post-depreciation", async (c) => {
+  const businessId = requireBusinessId(c);
+  const { fiscalYearId } = (await c.req.json()) as { fiscalYearId?: string };
+  if (!fiscalYearId) badRequest("fiscalYearIdを指定してください");
+  const entry = await postDepreciationForFiscalYear(businessId, c.req.param("id"), fiscalYearId!);
+  return c.json(entry);
+});

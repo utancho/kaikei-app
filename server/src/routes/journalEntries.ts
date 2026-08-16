@@ -1,5 +1,4 @@
-import { Router } from "express";
-import { asyncHandler } from "../lib/asyncHandler.js";
+import { Hono } from "hono";
 import { requireBusinessId, parseDateParam } from "../lib/requestHelpers.js";
 import { journalEntryInputSchema } from "../lib/zodSchemas.js";
 import {
@@ -9,57 +8,43 @@ import {
   listJournalEntries,
   updateJournalEntry,
 } from "../services/journalEntryService.js";
+import type { AppEnv } from "../types/env.js";
 
-export const journalEntriesRouter = Router();
+export const journalEntriesRouter = new Hono<AppEnv>();
 
-journalEntriesRouter.get(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const entries = await listJournalEntries(businessId, {
-      from: parseDateParam(req.query.from),
-      to: parseDateParam(req.query.to),
-      accountId: req.query.accountId as string | undefined,
-      keyword: req.query.keyword as string | undefined,
-    });
-    res.json(entries);
-  })
-);
+journalEntriesRouter.get("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  const entries = await listJournalEntries(businessId, {
+    from: parseDateParam(c.req.query("from")),
+    to: parseDateParam(c.req.query("to")),
+    accountId: c.req.query("accountId"),
+    keyword: c.req.query("keyword"),
+  });
+  return c.json(entries);
+});
 
-journalEntriesRouter.get(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const entry = await getJournalEntry(businessId, req.params.id);
-    res.json(entry);
-  })
-);
+journalEntriesRouter.get("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  const entry = await getJournalEntry(businessId, c.req.param("id"));
+  return c.json(entry);
+});
 
-journalEntriesRouter.post(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const input = journalEntryInputSchema.parse(req.body);
-    const entry = await createJournalEntry(businessId, input);
-    res.status(201).json(entry);
-  })
-);
+journalEntriesRouter.post("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  const input = journalEntryInputSchema.parse(await c.req.json());
+  const entry = await createJournalEntry(businessId, input);
+  return c.json(entry, 201);
+});
 
-journalEntriesRouter.put(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const input = journalEntryInputSchema.parse(req.body);
-    const entry = await updateJournalEntry(businessId, req.params.id, input);
-    res.json(entry);
-  })
-);
+journalEntriesRouter.put("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  const input = journalEntryInputSchema.parse(await c.req.json());
+  const entry = await updateJournalEntry(businessId, c.req.param("id"), input);
+  return c.json(entry);
+});
 
-journalEntriesRouter.delete(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    await deleteJournalEntry(businessId, req.params.id);
-    res.status(204).send();
-  })
-);
+journalEntriesRouter.delete("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  await deleteJournalEntry(businessId, c.req.param("id"));
+  return c.body(null, 204);
+});

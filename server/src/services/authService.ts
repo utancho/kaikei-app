@@ -6,7 +6,7 @@ function sanitizeUser(user: { id: string; email: string; name: string | null }) 
   return { id: user.id, email: user.email, name: user.name };
 }
 
-export async function signup(email: string, password: string, name?: string) {
+export async function signup(email: string, password: string, jwtSecret: string, name?: string) {
   if (password.length < 8) badRequest("パスワードは8文字以上で入力してください");
 
   const existing = await prisma.user.findUnique({ where: { email } });
@@ -22,18 +22,18 @@ export async function signup(email: string, password: string, name?: string) {
     },
   });
 
-  const token = signToken({ userId: user.id });
+  const token = await signToken({ userId: user.id }, jwtSecret);
   return { user: sanitizeUser(user), token };
 }
 
-export async function login(email: string, password: string) {
+export async function login(email: string, password: string, jwtSecret: string) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) badRequest("メールアドレスまたはパスワードが正しくありません");
 
   const ok = await verifyPassword(password, user!.passwordHash);
   if (!ok) badRequest("メールアドレスまたはパスワードが正しくありません");
 
-  const token = signToken({ userId: user!.id });
+  const token = await signToken({ userId: user!.id }, jwtSecret);
   return { user: sanitizeUser(user!), token };
 }
 

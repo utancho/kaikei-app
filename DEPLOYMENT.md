@@ -1,74 +1,128 @@
-# デプロイ手順(Railway推奨)
+# デプロイ手順(Cloudflare Pages + Workers + D1)
 
-このアプリはNode.js(Express)サーバーが、ビルド済みのReactクライアントとAPIを
-同一オリジンから配信する構成です。Railwayは無料枠から始められ、Dockerfileを
-自動検出してビルド・デプロイしてくれるため、この構成に向いています。
+このアプリはCloudflareの無料枠だけで動く構成です。
+
+- **フロントエンド**: Cloudflare Pages(Reactの静的ビルド)
+- **API**: Cloudflare Workers(Hono)
+- **DB**: Cloudflare D1(SQLite互換のエッジDB)
+
+Pages・Workers・D1はいずれも無料枠が用意されており、この規模のアプリであれば
+基本的に料金は発生しません([Workers無料枠](https://developers.cloudflare.com/workers/platform/pricing/): 1日10万リクエストまで無料)。
 
 ## 事前準備
 
-1. [Railway](https://railway.app) にサインアップし、GitHubアカウントと連携する。
-2. このリポジトリをGitHub上にプッシュする(まだの場合)。
+1. [Cloudflareアカウント](https://dash.cloudflare.com/sign-up)を作成(無料)。
+2. ローカルでCloudflareにログイン:
    ```bash
-   git remote add origin <あなたのGitHubリポジトリURL>
-   git push -u origin main
+   cd server
+   npx wrangler login
    ```
+   ブラウザが開くので、アカウントへのアクセスを許可してください。
 
-## Railwayでのセットアップ
-
-1. Railwayダッシュボードで **New Project → Deploy from GitHub repo** を選択し、
-   このリポジトリを選ぶ。
-2. Railwayが `Dockerfile` を自動検出してビルドを開始します(`railway.json` 済み)。
-3. **Variables** タブで以下の環境変数を設定してください。
-
-   | 変数名 | 説明 |
-   |---|---|
-   | `JWT_SECRET` | ランダムな文字列。`node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` で生成 |
-   | `APP_URL` | 公開後のURL(例: `https://your-app.up.railway.app`)。デプロイ後に判明するので後から設定してOK |
-   | `DATABASE_URL` | `file:/data/prod.db`(下記ボリューム設定と合わせる) |
-   | `STRIPE_SECRET_KEY` | Stripeのシークレットキー(課金機能を使う場合) |
-   | `STRIPE_PRICE_ID` | 月額プランのPrice ID(課金機能を使う場合) |
-   | `STRIPE_WEBHOOK_SECRET` | Webhook署名シークレット(課金機能を使う場合) |
-
-4. **データを永続化するため、ボリュームを追加**してください
-   (Settings → Volumes → New Volume)。マウントパスは `/data` に設定します。
-   SQLiteのファイルをこの中に置くことで、再デプロイしてもデータが消えません。
-
-5. デプロイが完了したら発行されたURLにアクセスし、動作を確認してください。
-
-> **将来的な改善案:** 現状はSQLite+ボリュームで動かしていますが、アクセスが増えてきたら
-> RailwayのPostgresアドオンに切り替えることを推奨します。切り替えは
-> `server/prisma/schema.prisma` の `datasource` の `provider` を `"postgresql"` に変更し、
-> `DATABASE_URL` をRailwayが発行するPostgres接続文字列に差し替えるだけです
-> (このスキーマはSQLite固有の記法を使っていないため、他の変更は不要です)。
-
-## Stripeのセットアップ(月額課金を有効にする場合)
-
-1. [Stripe](https://stripe.com) にサインアップ(テストモードなら本人確認不要ですぐ使えます)。
-2. ダッシュボードの **開発者 → APIキー** から、テスト用のシークレットキー
-   (`sk_test_...`)を取得し、`STRIPE_SECRET_KEY` に設定。
-3. **商品カタログ** で月額プラン(例: ¥1,980/月、定期支払い)を作成し、
-   発行された **Price ID**(`price_...`)を `STRIPE_PRICE_ID` に設定。
-4. **開発者 → Webhook** でエンドポイントを追加:
-   - URL: `https://<あなたのAPP_URL>/api/billing/webhook`
-   - 送信するイベント: `checkout.session.completed`, `customer.subscription.updated`,
-     `customer.subscription.deleted`
-   - 発行された署名シークレット(`whsec_...`)を `STRIPE_WEBHOOK_SECRET` に設定。
-5. 本番で実際に課金を開始する場合は、Stripeダッシュボードを「本番モード」に切り替え、
-   本番用のキー・Webhookに差し替えてください(本人確認・銀行口座登録が必要です)。
-
-ローカルでWebhookをテストしたい場合は [Stripe CLI](https://stripe.com/docs/stripe-cli) の
-`stripe listen --forward-to localhost:4000/api/billing/webhook` が使えます。
-
-## ローカルでのDocker動作確認(推奨)
-
-このDockerfileは開発環境にDockerがなかったため未検証です。デプロイ前に一度、
-手元で以下を実行して起動することを強くおすすめします。
+## 1. D1データベースの作成
 
 ```bash
-docker build -t kaikei .
-docker run -p 4000:4000 \
-  -e JWT_SECRET=test-secret \
-  -e DATABASE_URL="file:/app/server/prisma/dev.db" \
-  -e APP_URL="http://localhost:4000" \
-  kaikei
+cd server
+npx wrangler d1 create kaikei-db
 ```
+
+出力される `database_id` をコピーし、`server/wrangler.toml` の
+`database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"` を書き換えてください。
+
+本番DBにスキーマを反映します:
+
+```bash
+npm run d1:migrations:apply:remote
+```
+
+## 2. シークレットの設定(Workers)
+
+```bash
+npx wrangler secret put JWT_SECRET
+# プロンプトが出たらランダムな文字列を入力
+# 生成例: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+```
+
+Stripeの月額課金を使う場合(任意、後から設定してもOK):
+
+```bash
+npx wrangler secret put STRIPE_SECRET_KEY
+npx wrangler secret put STRIPE_PRICE_ID
+npx wrangler secret put STRIPE_WEBHOOK_SECRET
+```
+
+`server/wrangler.toml` の `[vars]` にある `APP_URL` は、後述のPagesデプロイで
+発行されるURLに合わせて更新してください(先にAPIだけ仮デプロイしてから
+Pagesを作り、判明したURLで更新→再デプロイ、という順序で問題ありません)。
+
+## 3. APIをWorkersにデプロイ
+
+```bash
+cd server
+npm run deploy
+```
+
+`https://kaikei-api.<あなたのサブドメイン>.workers.dev` のようなURLが発行されます。
+
+## 4. フロントエンドをPagesにデプロイ
+
+```bash
+cd client
+echo 'VITE_API_BASE_URL="https://kaikei-api.<あなたのサブドメイン>.workers.dev"' > .env.production.local
+npm run build
+npx wrangler pages deploy dist --project-name=kaikei-app
+```
+
+初回はプロジェクト作成の確認が出ます。発行されたURL(`https://kaikei-app.pages.dev`等)を
+`server/wrangler.toml` の `APP_URL` に設定し、`cd server && npm run deploy` で再デプロイしてください
+(Stripeのリダイレクト先・CORS許可オリジンとして使われます)。
+
+GitHubと連携して自動デプロイしたい場合は、Cloudflareダッシュボードの
+Pages画面から「Gitに接続」でこのリポジトリを選び、ビルド設定を
+`Build command: npm run build --workspace=client` / `Build output directory: client/dist` にしてください。
+
+## 5. Stripeのセットアップ(月額課金を有効にする場合)
+
+1. [Stripe](https://stripe.com) にサインアップ(テストモードなら本人確認不要ですぐ使えます)。
+2. ダッシュボードの **開発者 → APIキー** からテスト用シークレットキー(`sk_test_...`)を取得。
+3. **商品カタログ** で月額プラン(例: ¥1,980/月、定期支払い)を作成し、Price ID(`price_...`)を取得。
+4. **開発者 → Webhook** でエンドポイントを追加:
+   - URL: `https://kaikei-api.<あなたのサブドメイン>.workers.dev/api/billing/webhook`
+   - イベント: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+5. 取得した3つの値を上記の `wrangler secret put` で設定してください。
+6. 本番で実際に課金するには、Stripeダッシュボードを「本番モード」に切り替え、
+   本番用のキー・Webhookに差し替えてください(本人確認・銀行口座登録が必要です)。
+
+ローカルでWebhookをテストする場合は [Stripe CLI](https://stripe.com/docs/stripe-cli) の
+`stripe listen --forward-to localhost:4000/api/billing/webhook` が使えます。
+
+## ローカル開発
+
+```bash
+npm install
+cd server && cp .dev.vars.example .dev.vars   # JWT_SECRETを編集
+npm run d1:migrations:apply:local
+npm run dev              # Workers版APIサーバー(http://localhost:4000)
+```
+
+別ターミナルで:
+
+```bash
+npm run dev:client       # http://localhost:5173
+```
+
+初回データ投入(別ターミナルで、`npm run dev` 起動中に):
+
+```bash
+cd server
+npm run prisma:seed
+# 出力される wrangler d1 execute コマンドを実行してサブスクリプションをACTIVEにする
+```
+
+デモログイン: `demo@example.com` / `password123`
+
+## 今後の拡張候補
+
+- カスタムドメインを設定し、Pages/Workersを同一ドメイン配下(例: `app.example.com` /
+  `app.example.com/api`)にまとめると、Cookieのcross-site設定(`SameSite=None`)が不要になります。
+- Stripe本番運用時は、Webhookの再送・冪等性なども考慮した運用体制を検討してください。

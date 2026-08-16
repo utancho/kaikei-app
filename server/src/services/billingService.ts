@@ -1,13 +1,10 @@
 import { prisma } from "../lib/prisma.js";
-import { requireStripe } from "../lib/stripe.js";
 import { badRequest } from "../lib/httpError.js";
 import type Stripe from "stripe";
 
-const APP_URL = process.env.APP_URL || "http://localhost:5173";
 const TRIAL_DAYS = 14;
 
-async function ensureStripeCustomer(userId: string): Promise<string> {
-  const stripe = requireStripe();
+async function ensureStripeCustomer(stripe: Stripe, userId: string): Promise<string> {
   const user = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
   const subscription = await prisma.subscription.findUnique({ where: { userId } });
 
@@ -22,31 +19,28 @@ async function ensureStripeCustomer(userId: string): Promise<string> {
   return customer.id;
 }
 
-export async function createCheckoutSession(userId: string) {
-  const stripe = requireStripe();
-  const priceId = process.env.STRIPE_PRICE_ID;
+export async function createCheckoutSession(stripe: Stripe, userId: string, priceId: string | undefined, appUrl: string) {
   if (!priceId) badRequest("STRIPE_PRICE_ID が設定されていません");
 
-  const customerId = await ensureStripeCustomer(userId);
+  const customerId = await ensureStripeCustomer(stripe, userId);
 
   const session = await stripe.checkout.sessions.create({
     mode: "subscription",
     customer: customerId,
     line_items: [{ price: priceId, quantity: 1 }],
     subscription_data: { trial_period_days: TRIAL_DAYS },
-    success_url: `${APP_URL}/billing/success`,
-    cancel_url: `${APP_URL}/billing`,
+    success_url: `${appUrl}/billing/success`,
+    cancel_url: `${appUrl}/billing`,
   });
 
   return { url: session.url };
 }
 
-export async function createPortalSession(userId: string) {
-  const stripe = requireStripe();
-  const customerId = await ensureStripeCustomer(userId);
+export async function createPortalSession(stripe: Stripe, userId: string, appUrl: string) {
+  const customerId = await ensureStripeCustomer(stripe, userId);
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
-    return_url: `${APP_URL}/billing`,
+    return_url: `${appUrl}/billing`,
   });
   return { url: session.url };
 }
@@ -87,13 +81,12 @@ async function syncSubscriptionFromStripe(stripeSubscription: Stripe.Subscriptio
   });
 }
 
-export async function handleStripeWebhookEvent(event: Stripe.Event) {
+export async function handleStripeWebhookEvent(stripe: Stripe, event: Stripe.Event) {
   switch (event.type) {
     case "checkout.session.completed":
     case "customer.subscription.created":
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
-      const stripe = requireStripe();
       const subscriptionId =
         event.type === "checkout.session.completed"
           ? (event.data.object as Stripe.Checkout.Session).subscription

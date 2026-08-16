@@ -1,5 +1,4 @@
-import { Router } from "express";
-import { asyncHandler } from "../lib/asyncHandler.js";
+import { Hono } from "hono";
 import { requireBusinessId } from "../lib/requestHelpers.js";
 import { invoiceInputSchema } from "../lib/zodSchemas.js";
 import { badRequest } from "../lib/httpError.js";
@@ -12,67 +11,47 @@ import {
   recordInvoicePayment,
   updateInvoice,
 } from "../services/invoiceService.js";
+import type { AppEnv } from "../types/env.js";
 
-export const invoicesRouter = Router();
+export const invoicesRouter = new Hono<AppEnv>();
 
-invoicesRouter.get(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await listInvoices(businessId));
-  })
-);
+invoicesRouter.get("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await listInvoices(businessId));
+});
 
-invoicesRouter.get(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await getInvoice(businessId, req.params.id));
-  })
-);
+invoicesRouter.get("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await getInvoice(businessId, c.req.param("id")));
+});
 
-invoicesRouter.post(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const input = invoiceInputSchema.parse(req.body);
-    res.status(201).json(await createInvoice(businessId, input));
-  })
-);
+invoicesRouter.post("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  const input = invoiceInputSchema.parse(await c.req.json());
+  return c.json(await createInvoice(businessId, input), 201);
+});
 
-invoicesRouter.put(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const input = invoiceInputSchema.parse(req.body);
-    res.json(await updateInvoice(businessId, req.params.id, input));
-  })
-);
+invoicesRouter.put("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  const input = invoiceInputSchema.parse(await c.req.json());
+  return c.json(await updateInvoice(businessId, c.req.param("id"), input));
+});
 
-invoicesRouter.delete(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    await deleteInvoice(businessId, req.params.id);
-    res.status(204).send();
-  })
-);
+invoicesRouter.delete("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  await deleteInvoice(businessId, c.req.param("id"));
+  return c.body(null, 204);
+});
 
-invoicesRouter.post(
-  "/:id/post-journal",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await postInvoiceToJournal(businessId, req.params.id));
-  })
-);
+invoicesRouter.post("/:id/post-journal", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await postInvoiceToJournal(businessId, c.req.param("id")));
+});
 
-invoicesRouter.post(
-  "/:id/record-payment",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const { paymentAccountId, paymentDate } = req.body as { paymentAccountId?: string; paymentDate?: string };
-    if (!paymentAccountId) badRequest("paymentAccountIdを指定してください");
-    const date = paymentDate ? new Date(paymentDate) : new Date();
-    res.json(await recordInvoicePayment(businessId, req.params.id, paymentAccountId!, date));
-  })
-);
+invoicesRouter.post("/:id/record-payment", async (c) => {
+  const businessId = requireBusinessId(c);
+  const { paymentAccountId, paymentDate } = (await c.req.json()) as { paymentAccountId?: string; paymentDate?: string };
+  if (!paymentAccountId) badRequest("paymentAccountIdを指定してください");
+  const date = paymentDate ? new Date(paymentDate) : new Date();
+  return c.json(await recordInvoicePayment(businessId, c.req.param("id"), paymentAccountId!, date));
+});

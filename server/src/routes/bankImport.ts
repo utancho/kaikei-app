@@ -1,80 +1,52 @@
-import { Router } from "express";
-import multer from "multer";
-import { asyncHandler } from "../lib/asyncHandler.js";
+import { Hono } from "hono";
 import { requireBusinessId } from "../lib/requestHelpers.js";
 import { badRequest } from "../lib/httpError.js";
-import {
-  confirmRow,
-  createImportBatch,
-  getBatchRows,
-  ignoreRow,
-  listImportBatches,
-} from "../services/bankImportService.js";
+import { confirmRow, createImportBatch, getBatchRows, ignoreRow, listImportBatches } from "../services/bankImportService.js";
+import type { AppEnv } from "../types/env.js";
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    if (!file.originalname.toLowerCase().endsWith(".csv")) {
-      cb(new Error("CSVファイルのみアップロードできます"));
-      return;
-    }
-    cb(null, true);
-  },
+export const bankImportRouter = new Hono<AppEnv>();
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+bankImportRouter.post("/upload", async (c) => {
+  const businessId = requireBusinessId(c);
+  const body = await c.req.parseBody();
+  const accountId = body.accountId;
+  const file = body.file;
+
+  if (typeof accountId !== "string" || !accountId) badRequest("取込先の勘定科目(accountId)を指定してください");
+  if (!(file instanceof File)) badRequest("ファイルが指定されていません");
+  if (!file.name.toLowerCase().endsWith(".csv")) badRequest("CSVファイルのみアップロードできます");
+  if (file.size > MAX_FILE_SIZE) badRequest("ファイルサイズは5MB以下にしてください");
+
+  const content = await file.text();
+  const batch = await createImportBatch(businessId, accountId as string, file.name, content);
+  return c.json(batch, 201);
 });
 
-export const bankImportRouter = Router();
+bankImportRouter.get("/batches", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await listImportBatches(businessId));
+});
 
-bankImportRouter.post(
-  "/upload",
-  upload.single("file"),
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const accountId = req.body.accountId as string;
-    if (!accountId) badRequest("取込先の勘定科目(accountId)を指定してください");
-    if (!req.file) badRequest("ファイルが指定されていません");
+bankImportRouter.get("/batches/:id/rows", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await getBatchRows(businessId, c.req.param("id")));
+});
 
-    const content = req.file!.buffer.toString("utf-8");
-    const batch = await createImportBatch(businessId, accountId, req.file!.originalname, content);
-    res.status(201).json(batch);
-  })
-);
+bankImportRouter.post("/rows/:id/confirm", async (c) => {
+  const businessId = requireBusinessId(c);
+  const { counterpartAccountId, description } = (await c.req.json()) as {
+    counterpartAccountId?: string;
+    description?: string;
+  };
+  if (!counterpartAccountId) badRequest("相手勘定科目(counterpartAccountId)を指定してください");
+  const entry = await confirmRow(businessId, c.req.param("id"), counterpartAccountId, description);
+  return c.json(entry);
+});
 
-bankImportRouter.get(
-  "/batches",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await listImportBatches(businessId));
-  })
-);
-
-bankImportRouter.get(
-  "/batches/:id/rows",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await getBatchRows(businessId, req.params.id));
-  })
-);
-
-bankImportRouter.post(
-  "/rows/:id/confirm",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const { counterpartAccountId, description } = req.body as {
-      counterpartAccountId?: string;
-      description?: string;
-    };
-    if (!counterpartAccountId) badRequest("相手勘定科目(counterpartAccountId)を指定してください");
-    const entry = await confirmRow(businessId, req.params.id, counterpartAccountId, description);
-    res.json(entry);
-  })
-);
-
-bankImportRouter.post(
-  "/rows/:id/ignore",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    await ignoreRow(businessId, req.params.id);
-    res.status(204).send();
-  })
-);
+bankImportRouter.post("/rows/:id/ignore", async (c) => {
+  const businessId = requireBusinessId(c);
+  await ignoreRow(businessId, c.req.param("id"));
+  return c.body(null, 204);
+});

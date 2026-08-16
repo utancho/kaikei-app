@@ -2,7 +2,9 @@ node_modules/
 dist/
 build/
 .env
+.dev.vars
 *.db
 *.db-journal
 .DS_Store
 *.tsbuildinfo
+.wrangler/

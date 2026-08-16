@@ -12,9 +12,8 @@
     "build:server": "npm run build --workspace=server",
     "build:client": "npm run build --workspace=client",
     "build": "npm run build:client && npm run build:server",
-    "start": "node server/dist/index.js",
-    "deploy:migrate": "prisma migrate deploy --schema=server/prisma/schema.prisma",
-    "prisma:migrate": "npm run prisma:migrate --workspace=server",
+    "deploy:api": "npm run deploy --workspace=server",
+    "deploy:client": "npm run build --workspace=client && npx wrangler pages deploy client/dist --project-name=kaikei-app",
     "prisma:seed": "npm run prisma:seed --workspace=server"
   }
 }

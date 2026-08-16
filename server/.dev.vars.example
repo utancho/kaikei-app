@@ -1,0 +1,9 @@
+# ローカル開発用のシークレット。`.dev.vars` にコピーして使ってください(gitignore済み)。
+# 本番ではこのファイルではなく `wrangler secret put <NAME>` で設定します。
+
+JWT_SECRET="change-me-to-a-random-secret"
+
+# Stripe(課金機能を使う場合のみ)
+# STRIPE_SECRET_KEY="sk_test_..."
+# STRIPE_PRICE_ID="price_..."
+# STRIPE_WEBHOOK_SECRET="whsec_..."

@@ -1,42 +1,30 @@
-import { Router } from "express";
-import { asyncHandler } from "../lib/asyncHandler.js";
+import { Hono } from "hono";
 import { requireBusinessId } from "../lib/requestHelpers.js";
 import { templateInputSchema } from "../lib/zodSchemas.js";
 import { createTemplate, deleteTemplate, listTemplates, updateTemplate } from "../services/templateService.js";
+import type { AppEnv } from "../types/env.js";
 
-export const templatesRouter = Router();
+export const templatesRouter = new Hono<AppEnv>();
 
-templatesRouter.get(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    res.json(await listTemplates(businessId));
-  })
-);
+templatesRouter.get("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await listTemplates(businessId));
+});
 
-templatesRouter.post(
-  "/",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const input = templateInputSchema.parse(req.body);
-    res.status(201).json(await createTemplate(businessId, input));
-  })
-);
+templatesRouter.post("/", async (c) => {
+  const businessId = requireBusinessId(c);
+  const input = templateInputSchema.parse(await c.req.json());
+  return c.json(await createTemplate(businessId, input), 201);
+});
 
-templatesRouter.put(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    const input = templateInputSchema.parse(req.body);
-    res.json(await updateTemplate(businessId, req.params.id, input));
-  })
-);
+templatesRouter.put("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  const input = templateInputSchema.parse(await c.req.json());
+  return c.json(await updateTemplate(businessId, c.req.param("id"), input));
+});
 
-templatesRouter.delete(
-  "/:id",
-  asyncHandler(async (req, res) => {
-    const businessId = requireBusinessId(req);
-    await deleteTemplate(businessId, req.params.id);
-    res.status(204).send();
-  })
-);
+templatesRouter.delete("/:id", async (c) => {
+  const businessId = requireBusinessId(c);
+  await deleteTemplate(businessId, c.req.param("id"));
+  return c.body(null, 204);
+});

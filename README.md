@@ -2,12 +2,16 @@
 
 freee等を参考にした、複式簿記ベースの会計SaaSです。個人事業主・法人の両方に対応し、
 メール認証・Stripeによる月額課金・マルチテナント分離を備えています。
+Cloudflareの無料枠(Pages + Workers + D1)だけでホスティングできる構成です。
 
 ## 構成
 
-- `server/` — Node.js + Express + Prisma (SQLite) の API サーバー
-- `client/` — React + Vite + Tailwind CSS のフロントエンド
-- 本番ビルドでは `server` が `client/dist` を静的配信し、単一サービスとして動きます
+- `server/` — Cloudflare Workers上で動くAPI(Hono + Prisma + D1)
+- `client/` — React + Vite + Tailwind CSS のフロントエンド(Cloudflare Pagesで配信)
+
+ローカル開発では Vite Dev Server (`:5173`) が `wrangler dev` (`:4000`) にAPIリクエストを
+プロキシします。本番ではPages(静的サイト)とWorkers(API)を別々にデプロイします
+(詳細は [DEPLOYMENT.md](DEPLOYMENT.md))。
 
 ## 主な機能
 
@@ -36,34 +40,37 @@ freee等を参考にした、複式簿記ベースの会計SaaSです。個人�
 
 ```bash
 npm install
-cp server/.env.example server/.env   # JWT_SECRET等を必要に応じて編集
-```
-
-初回のみDBを作成しサンプルデータを投入します(デモログイン: `demo@example.com` / `password123`)。
-
-```bash
-cd server
-npx prisma migrate deploy
-npx tsx prisma/seed.ts
+cd server && cp .dev.vars.example .dev.vars   # JWT_SECRETを生成して設定
+npm run d1:migrations:apply:local              # ローカルD1にスキーマ反映
 ```
 
 ## 起動
 
 ```bash
-npm run dev:server   # http://localhost:4000
-npm run dev:client   # http://localhost:5173
+npm run dev:server   # http://localhost:4000 (wrangler dev / Workers)
+npm run dev:client   # http://localhost:5173 (Vite)
 ```
 
-ブラウザで `http://localhost:5173` を開いてください。Stripeの `STRIPE_SECRET_KEY` 等を
-設定しない場合、会計機能はそのまま使えますが決済(課金)機能は「準備中」として無効化されます。
+別ターミナルで初回データ投入(`dev:server` 起動中に実行):
+
+```bash
+cd server
+npm run prisma:seed
+# 出力される wrangler d1 execute コマンドを実行するとサブスクリプションがACTIVEになります
+```
+
+ブラウザで `http://localhost:5173` を開いてください(デモログイン: `demo@example.com` / `password123`)。
+Stripeの `STRIPE_SECRET_KEY` 等を設定しない場合、会計機能はそのまま使えますが
+決済(課金)機能は「準備中」として無効化されます。
 
 ## デプロイ
 
-[DEPLOYMENT.md](DEPLOYMENT.md) にRailwayへのデプロイ手順とStripeの設定手順をまとめています。
+[DEPLOYMENT.md](DEPLOYMENT.md) にCloudflare Pages / Workers / D1 へのデプロイ手順と
+Stripeの設定手順をまとめています。
 
 ## 今後の拡張候補
 
-- SQLite → Postgres への移行(アクセス増加時)
+- カスタムドメインでPages/Workersを同一ドメイン配下にまとめ、Cookieのcross-site設定を簡略化
 - 消費税申告書・法人税申告書の書式出力
 - 請求書のメール送信
 - 事業者ごとのメンバー招待(現状は1ユーザー=複数事業者だが、共同編集は未対応)

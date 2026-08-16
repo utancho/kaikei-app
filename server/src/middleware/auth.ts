@@ -1,44 +1,43 @@
-import type { NextFunction, Request, Response } from "express";
+import { getCookie } from "hono/cookie";
+import { createMiddleware } from "hono/factory";
 import { AUTH_COOKIE_NAME, verifyToken } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
+import type { AppEnv } from "../types/env.js";
 
-export function requireAuth(req: Request, res: Response, next: NextFunction) {
-  const token = req.cookies?.[AUTH_COOKIE_NAME];
+export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
+  const token = getCookie(c, AUTH_COOKIE_NAME);
   if (!token) {
-    res.status(401).json({ error: "ログインが必要です" });
-    return;
+    return c.json({ error: "ログインが必要です" }, 401);
   }
   try {
-    const payload = verifyToken(token);
-    req.userId = payload.userId;
-    next();
+    const payload = await verifyToken(token, c.env.JWT_SECRET);
+    c.set("userId", payload.userId);
+    await next();
   } catch {
-    res.status(401).json({ error: "ログインが必要です" });
+    return c.json({ error: "ログインが必要です" }, 401);
   }
-}
+});
 
 const ACTIVE_STATUSES = new Set(["TRIALING", "ACTIVE"]);
 
-export async function requireActiveSubscription(req: Request, res: Response, next: NextFunction) {
-  const subscription = await prisma.subscription.findUnique({ where: { userId: req.userId! } });
+export const requireActiveSubscription = createMiddleware<AppEnv>(async (c, next) => {
+  const subscription = await prisma.subscription.findUnique({ where: { userId: c.get("userId") } });
   if (!subscription || !ACTIVE_STATUSES.has(subscription.status)) {
-    res.status(402).json({ error: "有効なプランへの登録が必要です", code: "SUBSCRIPTION_REQUIRED" });
-    return;
+    return c.json({ error: "有効なプランへの登録が必要です", code: "SUBSCRIPTION_REQUIRED" }, 402);
   }
-  next();
-}
+  await next();
+});
 
 // businessId はクエリパラメータで渡される規約になっているため、ここで一括してアクセス権を検証する。
-export async function verifyBusinessOwnership(req: Request, res: Response, next: NextFunction) {
-  const businessId = (req.query.businessId as string | undefined) || (req.body?.businessId as string | undefined);
+export const verifyBusinessOwnership = createMiddleware<AppEnv>(async (c, next) => {
+  const businessId = c.req.query("businessId");
   if (!businessId) {
-    next();
+    await next();
     return;
   }
-  const business = await prisma.business.findFirst({ where: { id: businessId, ownerId: req.userId } });
+  const business = await prisma.business.findFirst({ where: { id: businessId, ownerId: c.get("userId") } });
   if (!business) {
-    res.status(403).json({ error: "この事業者へのアクセス権がありません" });
-    return;
+    return c.json({ error: "この事業者へのアクセス権がありません" }, 403);
   }
-  next();
-}
+  await next();
+});

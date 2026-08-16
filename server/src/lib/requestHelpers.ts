@@ -1,14 +1,16 @@
-import type { Request } from "express";
+import type { Context } from "hono";
 import { badRequest } from "./httpError.js";
 
-export function requireBusinessId(req: Request): string {
-  const businessId = (req.query.businessId as string) || (req.body?.businessId as string);
+// クライアントは常にクエリパラメータ ?businessId=... を付与する規約になっている
+// (POST/PUT/DELETEでも同様。verifyBusinessOwnershipミドルウェアもこれを前提にしている)。
+export function requireBusinessId(c: Context): string {
+  const businessId = c.req.query("businessId");
   if (!businessId) badRequest("businessId is required");
   return businessId;
 }
 
-export function parseDateParam(value: unknown): Date | undefined {
-  if (!value || typeof value !== "string") return undefined;
+export function parseDateParam(value: string | undefined): Date | undefined {
+  if (!value) return undefined;
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return undefined;
   return d;
