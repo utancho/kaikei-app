@@ -20,9 +20,8 @@ import type {
 } from "./types";
 
 // ローカル開発ではVite Proxy経由の相対パス "/api" を使う(vite.config.tsのproxy参照)。
-// 本番ではPages(静的サイト)とWorkers(API)が別ドメインになるため、
-// ビルド時に VITE_API_BASE_URL でWorkerの完全なURLを指定する。
-const API_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ""}/api`;
+// 本番も静的サイトとAPIが同一Worker・同一オリジンから配信されるため、常に相対パスでよい。
+const API_BASE = "/api";
 
 class ApiError extends Error {
   status: number;

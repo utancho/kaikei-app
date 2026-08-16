@@ -1,93 +1,75 @@
-# デプロイ手順(Cloudflare Pages + Workers + D1)
+# デプロイ手順(Cloudflare Workers + D1、単一プロジェクト)
 
-このアプリはCloudflareの無料枠だけで動く構成です。
+このアプリは**1つのCloudflare Worker**から、静的サイト(React)とAPI(Hono)の両方を
+配信します。CloudflareのGitHub連携(Workers Builds)を使う場合、リポジトリのルートに
+`wrangler.toml` があるので特別な設定は基本的に不要です。
 
-- **フロントエンド**: Cloudflare Pages(Reactの静的ビルド)
-- **API**: Cloudflare Workers(Hono)
-- **DB**: Cloudflare D1(SQLite互換のエッジDB)
+- フロント・API とも同一オリジンなので、Cookieのcross-site対応(`SameSite=None`等)が不要
+- Workers・D1 とも無料枠の範囲で動きます([Workers無料枠](https://developers.cloudflare.com/workers/platform/pricing/): 1日10万リクエストまで無料)
 
-Pages・Workers・D1はいずれも無料枠が用意されており、この規模のアプリであれば
-基本的に料金は発生しません([Workers無料枠](https://developers.cloudflare.com/workers/platform/pricing/): 1日10万リクエストまで無料)。
+## Cloudflareダッシュボード(Workers Builds)の設定値
 
-## 事前準備
+GitHub連携でこのリポジトリを接続した場合、プロジェクト設定は以下にしてください:
+
+| 項目 | 値 |
+|---|---|
+| Root directory | `/`(リポジトリ直下のまま) |
+| Build command | `npm run build` |
+| Deploy command | `npx wrangler deploy` |
+
+**重要:** Build commandは必ず `npm run build`(ワークスペース指定なしのルートコマンド)にしてください。
+これは「クライアントをビルドする」だけでなく「サーバー側で `prisma generate` を実行してPrisma Clientを
+生成する」処理も含んでいます。`npm run build --workspace=client` のようにクライアントだけをビルドすると、
+Prisma Clientが未生成のまま `wrangler deploy` がバンドルしてしまい、デプロイ後にAPIが正しく動作しません
+(Cloudflare Pagesはデフォルトでnpmのインストールスクリプトをブロックするため、`prisma generate` は
+明示的にビルドコマンドの中で実行する必要があります)。
+
+## 事前準備(初回のみ)
 
 1. [Cloudflareアカウント](https://dash.cloudflare.com/sign-up)を作成(無料)。
-2. ローカルでCloudflareにログイン:
+2. ローカルでログイン: `npx wrangler login`
+3. D1データベースを作成:
    ```bash
-   cd server
-   npx wrangler login
+   npx wrangler d1 create kaikei-db
    ```
-   ブラウザが開くので、アカウントへのアクセスを許可してください。
+   出力される `database_id` を `wrangler.toml` の
+   `database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"` に反映してください。
+4. 本番DBにスキーマを反映:
+   ```bash
+   npm run d1:migrations:apply:remote
+   ```
+5. シークレットを設定:
+   ```bash
+   npx wrangler secret put JWT_SECRET
+   # 生成例: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+   ```
+   Stripeを使う場合(任意、後からでもOK):
+   ```bash
+   npx wrangler secret put STRIPE_SECRET_KEY
+   npx wrangler secret put STRIPE_PRICE_ID
+   npx wrangler secret put STRIPE_WEBHOOK_SECRET
+   ```
+6. `wrangler.toml` の `[vars]` にある `APP_URL` を、初回デプロイ後に判明する
+   `https://<プロジェクト名>.<サブドメイン>.workers.dev` のようなURLに更新し、再デプロイしてください
+   (Stripeのリダイレクト先として使われます。カスタムドメインを使うならそのURLでOK)。
 
-## 1. D1データベースの作成
+## デプロイ
 
-```bash
-cd server
-npx wrangler d1 create kaikei-db
-```
+GitHub連携済みなら、`main` ブランチへのpushで自動的にビルド・デプロイされます。
 
-出力される `database_id` をコピーし、`server/wrangler.toml` の
-`database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"` を書き換えてください。
-
-本番DBにスキーマを反映します:
-
-```bash
-npm run d1:migrations:apply:remote
-```
-
-## 2. シークレットの設定(Workers)
-
-```bash
-npx wrangler secret put JWT_SECRET
-# プロンプトが出たらランダムな文字列を入力
-# 生成例: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-```
-
-Stripeの月額課金を使う場合(任意、後から設定してもOK):
-
-```bash
-npx wrangler secret put STRIPE_SECRET_KEY
-npx wrangler secret put STRIPE_PRICE_ID
-npx wrangler secret put STRIPE_WEBHOOK_SECRET
-```
-
-`server/wrangler.toml` の `[vars]` にある `APP_URL` は、後述のPagesデプロイで
-発行されるURLに合わせて更新してください(先にAPIだけ仮デプロイしてから
-Pagesを作り、判明したURLで更新→再デプロイ、という順序で問題ありません)。
-
-## 3. APIをWorkersにデプロイ
+手動でデプロイする場合:
 
 ```bash
-cd server
 npm run deploy
 ```
 
-`https://kaikei-api.<あなたのサブドメイン>.workers.dev` のようなURLが発行されます。
-
-## 4. フロントエンドをPagesにデプロイ
-
-```bash
-cd client
-echo 'VITE_API_BASE_URL="https://kaikei-api.<あなたのサブドメイン>.workers.dev"' > .env.production.local
-npm run build
-npx wrangler pages deploy dist --project-name=kaikei-app
-```
-
-初回はプロジェクト作成の確認が出ます。発行されたURL(`https://kaikei-app.pages.dev`等)を
-`server/wrangler.toml` の `APP_URL` に設定し、`cd server && npm run deploy` で再デプロイしてください
-(Stripeのリダイレクト先・CORS許可オリジンとして使われます)。
-
-GitHubと連携して自動デプロイしたい場合は、Cloudflareダッシュボードの
-Pages画面から「Gitに接続」でこのリポジトリを選び、ビルド設定を
-`Build command: npm run build --workspace=client` / `Build output directory: client/dist` にしてください。
-
-## 5. Stripeのセットアップ(月額課金を有効にする場合)
+## Stripeのセットアップ(月額課金を有効にする場合)
 
 1. [Stripe](https://stripe.com) にサインアップ(テストモードなら本人確認不要ですぐ使えます)。
 2. ダッシュボードの **開発者 → APIキー** からテスト用シークレットキー(`sk_test_...`)を取得。
 3. **商品カタログ** で月額プラン(例: ¥1,980/月、定期支払い)を作成し、Price ID(`price_...`)を取得。
 4. **開発者 → Webhook** でエンドポイントを追加:
-   - URL: `https://kaikei-api.<あなたのサブドメイン>.workers.dev/api/billing/webhook`
+   - URL: `https://<あなたのWorkerのURL>/api/billing/webhook`
    - イベント: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
 5. 取得した3つの値を上記の `wrangler secret put` で設定してください。
 6. 本番で実際に課金するには、Stripeダッシュボードを「本番モード」に切り替え、
@@ -100,29 +82,34 @@ Pages画面から「Gitに接続」でこのリポジトリを選び、ビルド
 
 ```bash
 npm install
-cd server && cp .dev.vars.example .dev.vars   # JWT_SECRETを編集
+cp .dev.vars.example .dev.vars   # JWT_SECRETを生成して設定
 npm run d1:migrations:apply:local
-npm run dev              # Workers版APIサーバー(http://localhost:4000)
+npm run build:client             # client/dist を一度作っておく(wranglerのassets用)
+npm run dev:server               # http://localhost:4000 (wrangler dev)
 ```
 
 別ターミナルで:
 
 ```bash
-npm run dev:client       # http://localhost:5173
+npm run dev:client       # http://localhost:5173 (Vite、HMR付き。/api を :4000 にプロキシ)
 ```
 
-初回データ投入(別ターミナルで、`npm run dev` 起動中に):
+普段の開発は `http://localhost:5173` を開いてください。`http://localhost:4000` に直接
+アクセスすると本番同様に静的ビルド+APIが1つのWorkerから返りますが、HMRは効きません。
+
+初回データ投入(`dev:server` 起動中に、別ターミナルで):
 
 ```bash
-cd server
-npm run prisma:seed
+cd server && npm run prisma:seed
 # 出力される wrangler d1 execute コマンドを実行してサブスクリプションをACTIVEにする
 ```
 
 デモログイン: `demo@example.com` / `password123`
 
-## 今後の拡張候補
+## トラブルシューティング
 
-- カスタムドメインを設定し、Pages/Workersを同一ドメイン配下(例: `app.example.com` /
-  `app.example.com/api`)にまとめると、Cookieのcross-site設定(`SameSite=None`)が不要になります。
-- Stripe本番運用時は、Webhookの再送・冪等性なども考慮した運用体制を検討してください。
+- **`Cannot find module '@prisma/client'` やモデルのプロパティが存在しないというTSエラーが出る**:
+  Prisma Clientが未生成です。`cd server && npx prisma generate` を実行してください。
+  CI上で起きる場合はBuild commandが `prisma generate` を含んでいるか確認してください。
+- **`wrangler deploy` が "run in the root of a workspace" エラーになる**:
+  `wrangler.toml` を見つけられていません。実行ディレクトリがリポジトリ直下になっているか確認してください。

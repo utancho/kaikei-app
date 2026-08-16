@@ -6,7 +6,6 @@
   "scripts": {
     "dev": "wrangler dev",
     "build": "prisma generate && tsc -p tsconfig.json --noEmit",
-    "deploy": "prisma generate && wrangler deploy",
     "prisma:generate": "prisma generate",
     "prisma:seed": "tsx prisma/seed.ts",
     "prisma:studio": "prisma studio",

@@ -12,10 +12,12 @@ export const authRouter = new Hono<AppEnv>();
 const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30日
 
 function setSessionCookie(c: Context<AppEnv>, token: string) {
+  // フロントエンドとAPIは同一Worker・同一オリジンから配信されるため、
+  // cross-site用の SameSite=None は不要 (Lax で十分)。
   setCookie(c, AUTH_COOKIE_NAME, token, {
     httpOnly: true,
     secure: c.env.ENVIRONMENT === "production",
-    sameSite: c.env.ENVIRONMENT === "production" ? "None" : "Lax",
+    sameSite: "Lax",
     maxAge: COOKIE_MAX_AGE_SECONDS,
     path: "/",
   });

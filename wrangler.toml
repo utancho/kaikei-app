@@ -1,0 +1,26 @@
+name = "kaikei-app"
+main = "server/src/index.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+# クライアント(client/dist)とAPIを同じWorkerからまとめて配信する。
+# 同一オリジンになるので、Cookieのcross-site設定(SameSite=None等)が不要になる。
+[assets]
+directory = "./client/dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*"]
+
+[vars]
+APP_URL = "http://localhost:5173"
+ENVIRONMENT = "development"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kaikei-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+migrations_dir = "server/migrations"
+
+# 本番用の値は Cloudflareダッシュボード / `wrangler secret put` で設定してください。
+# 機密情報(JWT_SECRET, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET)は
+# [vars] に書かず、必ず `wrangler secret put <NAME>` で設定してください。

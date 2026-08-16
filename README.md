@@ -2,16 +2,17 @@
 
 freee等を参考にした、複式簿記ベースの会計SaaSです。個人事業主・法人の両方に対応し、
 メール認証・Stripeによる月額課金・マルチテナント分離を備えています。
-Cloudflareの無料枠(Pages + Workers + D1)だけでホスティングできる構成です。
+Cloudflareの無料枠(Workers + D1)だけでホスティングできる構成です。
 
 ## 構成
 
-- `server/` — Cloudflare Workers上で動くAPI(Hono + Prisma + D1)
-- `client/` — React + Vite + Tailwind CSS のフロントエンド(Cloudflare Pagesで配信)
+- `server/` — API(Hono + Prisma + D1)
+- `client/` — React + Vite + Tailwind CSS のフロントエンド
 
+本番では静的サイト(`client/dist`)とAPIを**1つのCloudflare Worker**からまとめて配信します
+(ルートの `wrangler.toml` の `[assets]` 設定)。同一オリジンなのでCookieのcross-site対応は不要です。
 ローカル開発では Vite Dev Server (`:5173`) が `wrangler dev` (`:4000`) にAPIリクエストを
-プロキシします。本番ではPages(静的サイト)とWorkers(API)を別々にデプロイします
-(詳細は [DEPLOYMENT.md](DEPLOYMENT.md))。
+プロキシします(詳細は [DEPLOYMENT.md](DEPLOYMENT.md))。
 
 ## 主な機能
 
@@ -40,8 +41,9 @@ Cloudflareの無料枠(Pages + Workers + D1)だけでホスティングできる
 
 ```bash
 npm install
-cd server && cp .dev.vars.example .dev.vars   # JWT_SECRETを生成して設定
-npm run d1:migrations:apply:local              # ローカルD1にスキーマ反映
+cp .dev.vars.example .dev.vars   # JWT_SECRETを生成して設定
+npm run d1:migrations:apply:local  # ローカルD1にスキーマ反映
+npm run build:client               # client/dist を用意(wranglerのassets配信に必要)
 ```
 
 ## 起動
@@ -65,12 +67,11 @@ Stripeの `STRIPE_SECRET_KEY` 等を設定しない場合、会計機能はそ�
 
 ## デプロイ
 
-[DEPLOYMENT.md](DEPLOYMENT.md) にCloudflare Pages / Workers / D1 へのデプロイ手順と
+[DEPLOYMENT.md](DEPLOYMENT.md) にCloudflare Workers + D1 へのデプロイ手順と
 Stripeの設定手順をまとめています。
 
 ## 今後の拡張候補
 
-- カスタムドメインでPages/Workersを同一ドメイン配下にまとめ、Cookieのcross-site設定を簡略化
 - 消費税申告書・法人税申告書の書式出力
 - 請求書のメール送信
 - 事業者ごとのメンバー招待(現状は1ユーザー=複数事業者だが、共同編集は未対応)
