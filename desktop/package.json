@@ -26,7 +26,7 @@
     "icon": "build/icon.png",
     "mac": {
       "category": "public.app-category.finance",
-      "target": ["dmg"]
+      "target": [{ "target": "dmg", "arch": ["universal"] }]
     },
     "win": {
       "target": ["nsis"]
