@@ -2,8 +2,8 @@ import { prisma } from "../lib/prisma.js";
 import { badRequest } from "../lib/httpError.js";
 import { hashPassword, signToken, verifyPassword } from "../lib/auth.js";
 
-function sanitizeUser(user: { id: string; email: string; name: string | null }) {
-  return { id: user.id, email: user.email, name: user.name };
+function sanitizeUser(user: { id: string; email: string; name: string | null; role: string }) {
+  return { id: user.id, email: user.email, name: user.name, role: user.role };
 }
 
 export async function signup(email: string, password: string, jwtSecret: string, name?: string) {

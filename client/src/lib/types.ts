@@ -303,3 +303,25 @@ export interface BankTransactionRow {
   status: "UNMATCHED" | "MATCHED" | "IGNORED";
   matchedJournalEntryId?: string | null;
 }
+
+export type SubscriptionStatus = "NONE" | "TRIALING" | "ACTIVE" | "PAST_DUE" | "CANCELED";
+
+export interface AdminUser {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  createdAt: string;
+  businessCount: number;
+  subscription: {
+    status: SubscriptionStatus;
+    currentPeriodEnd: string | null;
+  };
+}
+
+export interface AdminStats {
+  totalUsers: number;
+  activeCount: number;
+  trialingCount: number;
+  mrrJpy: number | null;
+}

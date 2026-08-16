@@ -28,6 +28,14 @@ export const requireActiveSubscription = createMiddleware<AppEnv>(async (c, next
   await next();
 });
 
+export const requireAdmin = createMiddleware<AppEnv>(async (c, next) => {
+  const user = await prisma.user.findUnique({ where: { id: c.get("userId") } });
+  if (!user || user.role !== "ADMIN") {
+    return c.json({ error: "管理者権限が必要です" }, 403);
+  }
+  await next();
+});
+
 // businessId はクエリパラメータで渡される規約になっているため、ここで一括してアクセス権を検証する。
 export const verifyBusinessOwnership = createMiddleware<AppEnv>(async (c, next) => {
   const businessId = c.req.query("businessId");

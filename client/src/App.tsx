@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from "react-router-dom";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BusinessProvider, useBusiness } from "./context/BusinessContext";
 import { Layout } from "./components/Layout";
@@ -28,6 +28,7 @@ import BlueReturn from "./pages/BlueReturn";
 import BlueReturnPrint from "./pages/BlueReturnPrint";
 import PartnerBalances from "./pages/PartnerBalances";
 import MonthlyTrend from "./pages/MonthlyTrend";
+import Admin from "./pages/Admin";
 
 function WorkspaceRoutes() {
   const { loading, currentBusiness } = useBusiness();
@@ -71,6 +72,7 @@ function WorkspaceRoutes() {
 
 function AppRoutes() {
   const { user, loading, isSubscriptionActive } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
@@ -82,6 +84,14 @@ function AppRoutes() {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="*" element={<Landing />} />
+      </Routes>
+    );
+  }
+
+  if (user.role === "ADMIN" && location.pathname.startsWith("/admin")) {
+    return (
+      <Routes>
+        <Route path="/admin" element={<Admin />} />
       </Routes>
     );
   }

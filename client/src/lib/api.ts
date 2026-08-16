@@ -1,5 +1,7 @@
 import type {
   Account,
+  AdminStats,
+  AdminUser,
   BalanceSheet,
   BankImportBatch,
   BankTransactionRow,
@@ -15,6 +17,7 @@ import type {
   Partner,
   PartnerBalancesResponse,
   ProfitLoss,
+  SubscriptionStatus,
   TaxCategory,
   TrialBalanceRow,
 } from "./types";
@@ -63,19 +66,19 @@ function qs(params: Record<string, string | undefined>): string {
 export const api = {
   // Auth
   signup: (email: string, password: string, name?: string) =>
-    request<{ user: { id: string; email: string; name: string | null } }>("/auth/signup", {
+    request<{ user: { id: string; email: string; name: string | null; role: string } }>("/auth/signup", {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     }),
   login: (email: string, password: string) =>
-    request<{ user: { id: string; email: string; name: string | null } }>("/auth/login", {
+    request<{ user: { id: string; email: string; name: string | null; role: string } }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
     }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
   me: () =>
     request<{
-      user: { id: string; email: string; name: string | null };
+      user: { id: string; email: string; name: string | null; role: string };
       subscription: { status: string; currentPeriodEnd: string | null } | null;
     }>("/auth/me"),
 
@@ -219,6 +222,12 @@ export const api = {
   // Blue return statement (青色申告決算書)
   getBlueReturn: (businessId: string, from?: string, to?: string) =>
     request<BlueReturnStatement>(`/reports/blue-return${qs({ businessId, from, to })}`),
+
+  // Admin
+  adminListUsers: () => request<AdminUser[]>("/admin/users"),
+  adminGetStats: () => request<AdminStats>("/admin/stats"),
+  adminUpdateSubscription: (userId: string, status: SubscriptionStatus) =>
+    request<void>(`/admin/users/${userId}/subscription`, { method: "PATCH", body: JSON.stringify({ status }) }),
 };
 
 export { ApiError };

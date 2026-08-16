@@ -1,4 +1,4 @@
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, Link } from "react-router-dom";
 import {
   LayoutDashboard,
   BookText,
@@ -19,6 +19,7 @@ import {
   Contact,
   BarChart3,
   LogOut,
+  ShieldCheck,
 } from "lucide-react";
 import { useState } from "react";
 import { useBusiness } from "../context/BusinessContext";
@@ -140,6 +141,15 @@ export function Layout() {
                 <div className="fixed inset-0 z-10" onClick={() => setUserMenuOpen(false)} />
                 <div className="absolute right-0 mt-1 w-48 bg-white border rounded-lg shadow-lg z-20 py-1">
                   <div className="px-3 py-2 text-xs text-gray-400 truncate border-b border-gray-100">{user?.email}</div>
+                  {user?.role === "ADMIN" && (
+                    <Link
+                      to="/admin"
+                      className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                      onClick={() => setUserMenuOpen(false)}
+                    >
+                      <ShieldCheck size={14} /> 管理者ダッシュボード
+                    </Link>
+                  )}
                   <button
                     className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
                     onClick={() => logout()}

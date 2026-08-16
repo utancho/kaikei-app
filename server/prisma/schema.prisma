@@ -19,6 +19,7 @@ model User {
   email        String   @unique
   passwordHash String
   name         String?
+  role         String   @default("USER") // USER | ADMIN
   createdAt    DateTime @default(now())
 
   businesses   Business[]

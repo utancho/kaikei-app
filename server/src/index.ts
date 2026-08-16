@@ -2,8 +2,9 @@ import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { runWithPrisma } from "./lib/prisma.js";
 import { errorHandler } from "./middleware/errorHandler.js";
-import { requireActiveSubscription, requireAuth, verifyBusinessOwnership } from "./middleware/auth.js";
+import { requireActiveSubscription, requireAdmin, requireAuth, verifyBusinessOwnership } from "./middleware/auth.js";
 import { authRouter } from "./routes/auth.js";
+import { adminRouter } from "./routes/admin.js";
 import { billingRouter, webhookRouter } from "./routes/billing.js";
 import { businessRouter } from "./routes/business.js";
 import { accountsRouter, taxCategoriesRouter } from "./routes/accounts.js";
@@ -74,5 +75,8 @@ app.route("/api/fixed-assets", fixedAssetsRouter);
 
 app.use("/api/templates/*", ...businessScoped);
 app.route("/api/templates", templatesRouter);
+
+app.use("/api/admin/*", requireAuth, requireAdmin);
+app.route("/api/admin", adminRouter);
 
 export default app;
