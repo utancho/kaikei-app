@@ -1,41 +1,47 @@
+import { lazy, Suspense } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BusinessProvider, useBusiness } from "./context/BusinessContext";
 import { Layout } from "./components/Layout";
-import Landing from "./pages/Landing";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
-import Billing from "./pages/Billing";
-import BillingSuccess from "./pages/BillingSuccess";
-import Dashboard from "./pages/Dashboard";
-import JournalEntries from "./pages/JournalEntries";
-import JournalEntryForm from "./pages/JournalEntryForm";
-import Accounts from "./pages/Accounts";
-import Partners from "./pages/Partners";
-import GeneralLedger from "./pages/GeneralLedger";
-import TrialBalance from "./pages/TrialBalance";
-import ProfitLoss from "./pages/ProfitLoss";
-import BalanceSheet from "./pages/BalanceSheet";
-import Invoices from "./pages/Invoices";
-import InvoiceForm from "./pages/InvoiceForm";
-import InvoicePrint from "./pages/InvoicePrint";
-import BankImport from "./pages/BankImport";
-import Settings from "./pages/Settings";
-import OnboardingWizard from "./pages/OnboardingWizard";
-import FixedAssets from "./pages/FixedAssets";
-import JournalEntryTemplates from "./pages/JournalEntryTemplates";
-import BlueReturn from "./pages/BlueReturn";
-import BlueReturnPrint from "./pages/BlueReturnPrint";
-import ConsumptionTax from "./pages/ConsumptionTax";
-import Budget from "./pages/Budget";
-import CashFlowForecast from "./pages/CashFlowForecast";
-import ReceiptScan from "./pages/ReceiptScan";
-import PartnerBalances from "./pages/PartnerBalances";
-import MonthlyTrend from "./pages/MonthlyTrend";
-import Admin from "./pages/Admin";
-import CommercialTransactions from "./pages/legal/CommercialTransactions";
-import PrivacyPolicy from "./pages/legal/PrivacyPolicy";
-import TermsOfService from "./pages/legal/TermsOfService";
+
+const Landing = lazy(() => import("./pages/Landing"));
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
+const Billing = lazy(() => import("./pages/Billing"));
+const BillingSuccess = lazy(() => import("./pages/BillingSuccess"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const JournalEntries = lazy(() => import("./pages/JournalEntries"));
+const JournalEntryForm = lazy(() => import("./pages/JournalEntryForm"));
+const Accounts = lazy(() => import("./pages/Accounts"));
+const Partners = lazy(() => import("./pages/Partners"));
+const GeneralLedger = lazy(() => import("./pages/GeneralLedger"));
+const TrialBalance = lazy(() => import("./pages/TrialBalance"));
+const ProfitLoss = lazy(() => import("./pages/ProfitLoss"));
+const BalanceSheet = lazy(() => import("./pages/BalanceSheet"));
+const Invoices = lazy(() => import("./pages/Invoices"));
+const InvoiceForm = lazy(() => import("./pages/InvoiceForm"));
+const InvoicePrint = lazy(() => import("./pages/InvoicePrint"));
+const BankImport = lazy(() => import("./pages/BankImport"));
+const Settings = lazy(() => import("./pages/Settings"));
+const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
+const FixedAssets = lazy(() => import("./pages/FixedAssets"));
+const JournalEntryTemplates = lazy(() => import("./pages/JournalEntryTemplates"));
+const BlueReturn = lazy(() => import("./pages/BlueReturn"));
+const BlueReturnPrint = lazy(() => import("./pages/BlueReturnPrint"));
+const ConsumptionTax = lazy(() => import("./pages/ConsumptionTax"));
+const Budget = lazy(() => import("./pages/Budget"));
+const CashFlowForecast = lazy(() => import("./pages/CashFlowForecast"));
+const ReceiptScan = lazy(() => import("./pages/ReceiptScan"));
+const PartnerBalances = lazy(() => import("./pages/PartnerBalances"));
+const MonthlyTrend = lazy(() => import("./pages/MonthlyTrend"));
+const Admin = lazy(() => import("./pages/Admin"));
+const CommercialTransactions = lazy(() => import("./pages/legal/CommercialTransactions"));
+const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
+const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
+
+function PageFallback() {
+  return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
+}
 
 function LegalRoutes() {
   return (
@@ -51,7 +57,7 @@ function WorkspaceRoutes() {
   const { loading, currentBusiness } = useBusiness();
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
+    return <PageFallback />;
   }
 
   if (!currentBusiness) {
@@ -97,7 +103,7 @@ function AppRoutes() {
   const location = useLocation();
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
+    return <PageFallback />;
   }
 
   if (!user) {
@@ -139,7 +145,9 @@ function AppRoutes() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppRoutes />
+      <Suspense fallback={<PageFallback />}>
+        <AppRoutes />
+      </Suspense>
     </AuthProvider>
   );
 }

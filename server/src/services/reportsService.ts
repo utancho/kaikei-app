@@ -126,13 +126,10 @@ export async function getGeneralLedger(
 const PL_CATEGORIES: AccountCategory[] = ["REVENUE", "EXPENSE"];
 const BS_CATEGORIES: AccountCategory[] = ["ASSET", "LIABILITY", "EQUITY"];
 
-export async function getProfitAndLoss(businessId: string, from: Date, to: Date) {
-  const accounts = await prisma.account.findMany({
-    where: { businessId, isActive: true, category: { in: PL_CATEGORIES } },
-    orderBy: [{ category: "asc" }, { displayOrder: "asc" }],
-  });
-  const totals = await sumLinesByAccount(businessId, { gte: from, lte: to });
-
+function summarizeProfitAndLoss(
+  accounts: { id: string; code: string; name: string; category: string; subcategory: string; normalBalance: string }[],
+  totals: Map<string, Totals>
+) {
   const lineItems = accounts
     .map((a) => ({
       accountId: a.id,
@@ -162,7 +159,6 @@ export async function getProfitAndLoss(businessId: string, from: Date, to: Date)
   const netIncome = incomeBeforeTax - taxes;
 
   return {
-    period: { from, to },
     lineItems,
     summary: {
       sales,
@@ -180,6 +176,17 @@ export async function getProfitAndLoss(businessId: string, from: Date, to: Date)
       netIncome,
     },
   };
+}
+
+export async function getProfitAndLoss(businessId: string, from: Date, to: Date) {
+  const accounts = await prisma.account.findMany({
+    where: { businessId, isActive: true, category: { in: PL_CATEGORIES } },
+    orderBy: [{ category: "asc" }, { displayOrder: "asc" }],
+  });
+  const totals = await sumLinesByAccount(businessId, { gte: from, lte: to });
+  const { lineItems, summary } = summarizeProfitAndLoss(accounts, totals);
+
+  return { period: { from, to }, lineItems, summary };
 }
 
 export async function getBalanceSheet(businessId: string, fiscalYearStart: Date, asOf: Date) {
@@ -228,25 +235,59 @@ export async function getBalanceSheet(businessId: string, fiscalYearStart: Date,
 
 const CASH_ACCOUNT_CODES = ["1010", "1020", "1030", "1040", "1050"];
 
+function monthKey(d: Date): string {
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+}
+
+// 過去分の月次推移は、月ごとにDBへ問い合わせる代わりに対象期間の明細を1回で取得し、
+// JS側で月ごとに集計する(N+1回避)。
 export async function getCashTrend(businessId: string, months: number) {
   const cashAccounts = await prisma.account.findMany({
     where: { businessId, code: { in: CASH_ACCOUNT_CODES } },
   });
-
+  const cashAccountIds = cashAccounts.map((a) => a.id);
   const now = new Date();
+  const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+
   const points: { month: string; balance: number }[] = [];
+  if (cashAccountIds.length === 0) {
+    for (let i = months - 1; i >= 0; i--) {
+      points.push({ month: monthKey(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))), balance: 0 });
+    }
+    return points;
+  }
+
+  const [openingTotals, lines] = await Promise.all([
+    sumLinesByAccount(businessId, { lte: new Date(windowStart.getTime() - 1) }),
+    prisma.journalEntryLine.findMany({
+      where: {
+        accountId: { in: cashAccountIds },
+        journalEntry: { status: "CONFIRMED", entryDate: { gte: windowStart, lte: now } },
+      },
+      select: { accountId: true, side: true, amount: true, journalEntry: { select: { entryDate: true } } },
+    }),
+  ]);
+
+  const linesByMonth = new Map<string, typeof lines>();
+  for (const l of lines) {
+    const key = monthKey(l.journalEntry.entryDate);
+    const bucket = linesByMonth.get(key);
+    if (bucket) bucket.push(l);
+    else linesByMonth.set(key, [l]);
+  }
+
+  const running = new Map<string, Totals>(cashAccountIds.map((id) => [id, { ...(openingTotals.get(id) ?? { debit: 0, credit: 0 }) }]));
 
   for (let i = months - 1; i >= 0; i--) {
     const monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const isCurrentMonth = i === 0;
-    const asOf = isCurrentMonth ? now : new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth() + 1, 1) - 1);
-
-    const totals = await sumLinesByAccount(businessId, { lte: asOf });
-    const balance = cashAccounts.reduce(
-      (sum, a) => sum + signedBalance(a.normalBalance as NormalBalance, totals.get(a.id) ?? { debit: 0, credit: 0 }),
-      0
-    );
-    points.push({ month: `${monthDate.getUTCFullYear()}-${String(monthDate.getUTCMonth() + 1).padStart(2, "0")}`, balance });
+    const key = monthKey(monthDate);
+    for (const l of linesByMonth.get(key) ?? []) {
+      const t = running.get(l.accountId)!;
+      if (l.side === "DEBIT") t.debit += l.amount;
+      else t.credit += l.amount;
+    }
+    const balance = cashAccounts.reduce((sum, a) => sum + signedBalance(a.normalBalance as NormalBalance, running.get(a.id)!), 0);
+    points.push({ month: key, balance });
   }
 
   return points;
@@ -302,18 +343,49 @@ export async function getPartnerBalances(businessId: string) {
 }
 
 export async function getMonthlyTrend(businessId: string, months: number) {
-  const now = new Date();
-  const points: { month: string; sales: number; expenses: number; netIncome: number }[] = [];
+  const accounts = await prisma.account.findMany({
+    where: { businessId, isActive: true, category: { in: PL_CATEGORIES } },
+    orderBy: [{ category: "asc" }, { displayOrder: "asc" }],
+  });
+  const accountIds = accounts.map((a) => a.id);
 
+  const now = new Date();
+  const windowStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (months - 1), 1));
+
+  const lines = accountIds.length
+    ? await prisma.journalEntryLine.findMany({
+        where: {
+          accountId: { in: accountIds },
+          journalEntry: { status: "CONFIRMED", entryDate: { gte: windowStart, lte: now } },
+        },
+        select: { accountId: true, side: true, amount: true, journalEntry: { select: { entryDate: true } } },
+      })
+    : [];
+
+  const totalsByMonth = new Map<string, Map<string, Totals>>();
+  for (const l of lines) {
+    const key = monthKey(l.journalEntry.entryDate);
+    let monthTotals = totalsByMonth.get(key);
+    if (!monthTotals) {
+      monthTotals = new Map();
+      totalsByMonth.set(key, monthTotals);
+    }
+    const entry = monthTotals.get(l.accountId) ?? { debit: 0, credit: 0 };
+    if (l.side === "DEBIT") entry.debit += l.amount;
+    else entry.credit += l.amount;
+    monthTotals.set(l.accountId, entry);
+  }
+
+  const points: { month: string; sales: number; expenses: number; netIncome: number }[] = [];
   for (let i = months - 1; i >= 0; i--) {
-    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const monthEnd = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1) - 1);
-    const pl = await getProfitAndLoss(businessId, monthStart, monthEnd);
+    const monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = monthKey(monthDate);
+    const { summary } = summarizeProfitAndLoss(accounts, totalsByMonth.get(key) ?? new Map());
     points.push({
-      month: `${monthStart.getUTCFullYear()}-${String(monthStart.getUTCMonth() + 1).padStart(2, "0")}`,
-      sales: pl.summary.sales,
-      expenses: pl.summary.cogs + pl.summary.sga + pl.summary.nonOperatingExpense + pl.summary.extraordinaryLoss,
-      netIncome: pl.summary.netIncome,
+      month: key,
+      sales: summary.sales,
+      expenses: summary.cogs + summary.sga + summary.nonOperatingExpense + summary.extraordinaryLoss,
+      netIncome: summary.netIncome,
     });
   }
 
