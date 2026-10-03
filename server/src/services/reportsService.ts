@@ -472,6 +472,15 @@ export async function getBusinessAnalysis(businessId: string, from: Date, to: Da
   const hasData = pl.summary.sales !== 0 || bs.totalAssets !== 0;
   const hasPrevious = prevPl.summary.sales !== 0 || prevBs.totalAssets !== 0;
 
+  // 損益分岐点分析(簡易モデル): 変動費≈売上原価、固定費≈販売費及び一般管理費 とみなす。
+  const variableCosts = pl.summary.cogs;
+  const fixedCosts = pl.summary.sga;
+  const marginalProfitRatio = pl.summary.sales > 0 ? (pl.summary.sales - variableCosts) / pl.summary.sales : null;
+  const breakEvenSales =
+    marginalProfitRatio && marginalProfitRatio > 0 ? Math.round(fixedCosts / marginalProfitRatio) : null;
+  const marginOfSafetyRatio =
+    breakEvenSales !== null && pl.summary.sales > 0 ? ((pl.summary.sales - breakEvenSales) / pl.summary.sales) * 100 : null;
+
   return {
     period: { from, to },
     previousPeriod: prev,
@@ -486,6 +495,14 @@ export async function getBusinessAnalysis(businessId: string, from: Date, to: Da
       totalEquity: bs.totalEquity,
     },
     indicators: { profitability, safety, efficiency },
+    breakEven: {
+      sales: pl.summary.sales,
+      variableCosts,
+      fixedCosts,
+      marginalProfitRatio: marginalProfitRatio === null ? null : marginalProfitRatio * 100,
+      breakEvenSales,
+      marginOfSafetyRatio,
+    },
     yoy,
   };
 }

@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, Minus, LineChart as LineChartIcon } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Minus, LineChart as LineChartIcon, Printer } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { api } from "../lib/api";
 import { formatYen } from "../lib/format";
 import type { AnalysisIndicator, BusinessAnalysis } from "../lib/types";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card, CardHeader } from "../components/ui/Card";
+import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Skeleton } from "../components/ui/Skeleton";
 
@@ -107,6 +108,13 @@ export default function ManagementAnalysis() {
       <PageHeader
         title="経営分析"
         subtitle={`${data.period.from.slice(0, 10)} 〜 ${data.period.to.slice(0, 10)}(前年同期比)`}
+        action={
+          data.hasData ? (
+            <Button variant="secondary" icon={<Printer size={14} />} onClick={() => window.print()} className="no-print">
+              印刷 / PDF
+            </Button>
+          ) : undefined
+        }
       />
 
       {!data.hasData ? (
@@ -138,6 +146,69 @@ export default function ManagementAnalysis() {
           <IndicatorSection title="収益性" items={data.indicators.profitability} />
           <IndicatorSection title="安全性" items={data.indicators.safety} />
           <IndicatorSection title="効率性" items={data.indicators.efficiency} />
+
+          <Card>
+            <CardHeader title="損益分岐点分析" subtitle="変動費≈売上原価・固定費≈販管費 とみなした簡易モデル" />
+            <div className="p-5 grid grid-cols-2 sm:grid-cols-3 gap-4">
+              <div>
+                <div className="text-xs text-gray-500">損益分岐点売上高</div>
+                <div className="text-xl font-bold text-gray-900 mt-0.5 tabular-nums">
+                  {data.breakEven.breakEvenSales === null ? "—" : formatYen(data.breakEven.breakEvenSales)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">限界利益率</div>
+                <div className="text-xl font-bold text-gray-900 mt-0.5 tabular-nums">
+                  {data.breakEven.marginalProfitRatio === null ? "—" : `${data.breakEven.marginalProfitRatio.toFixed(1)} %`}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">安全余裕率</div>
+                <div
+                  className={`text-xl font-bold mt-0.5 tabular-nums ${
+                    (data.breakEven.marginOfSafetyRatio ?? 0) < 0 ? "text-red-600" : "text-gray-900"
+                  }`}
+                >
+                  {data.breakEven.marginOfSafetyRatio === null ? "—" : `${data.breakEven.marginOfSafetyRatio.toFixed(1)} %`}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">固定費(販管費)</div>
+                <div className="text-sm font-medium text-gray-700 mt-1 tabular-nums">{formatYen(data.breakEven.fixedCosts)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">変動費(売上原価)</div>
+                <div className="text-sm font-medium text-gray-700 mt-1 tabular-nums">{formatYen(data.breakEven.variableCosts)}</div>
+              </div>
+              <div>
+                <div className="text-xs text-gray-500">当期売上高</div>
+                <div className="text-sm font-medium text-gray-700 mt-1 tabular-nums">{formatYen(data.breakEven.sales)}</div>
+              </div>
+            </div>
+            {data.breakEven.breakEvenSales !== null && data.breakEven.sales > 0 && (
+              <div className="px-5 pb-5">
+                <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                  <span>損益分岐点</span>
+                  <span>当期売上</span>
+                </div>
+                <div className="relative h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 left-0 bg-brand-500 rounded-full"
+                    style={{ width: `${Math.min(100, (data.breakEven.sales / Math.max(data.breakEven.breakEvenSales, data.breakEven.sales)) * 100)}%` }}
+                  />
+                  <div
+                    className="absolute inset-y-0 w-0.5 bg-red-500"
+                    style={{ left: `${Math.min(100, (data.breakEven.breakEvenSales / Math.max(data.breakEven.breakEvenSales, data.breakEven.sales)) * 100)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {data.breakEven.sales >= data.breakEven.breakEvenSales
+                    ? "当期売上は損益分岐点を上回っています(黒字体質)。"
+                    : "当期売上が損益分岐点を下回っています。固定費の見直しや売上増が必要です。"}
+                </p>
+              </div>
+            )}
+          </Card>
 
           <Card>
             <CardHeader title="前年同期比較" subtitle={`前年: ${data.previousPeriod.from.slice(0, 10)} 〜 ${data.previousPeriod.to.slice(0, 10)}`} />

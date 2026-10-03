@@ -92,7 +92,7 @@ export function Layout() {
   return (
     <div className="flex h-full min-h-screen">
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-      <aside className="w-56 shrink-0 bg-brand-900 text-brand-50 flex flex-col">
+      <aside className="w-56 shrink-0 bg-brand-900 text-brand-50 flex flex-col no-print">
         <div className="px-4 py-5 flex items-center gap-2">
           <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center shrink-0">
             <Wallet size={18} className="text-white" />
@@ -134,7 +134,7 @@ export function Layout() {
         </nav>
       </aside>
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0">
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 no-print">
           <div className="text-sm text-gray-600 flex items-center gap-2">
             {currentBusiness ? (
               <>

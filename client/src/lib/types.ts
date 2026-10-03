@@ -414,6 +414,14 @@ export interface BusinessAnalysis {
     safety: AnalysisIndicator[];
     efficiency: AnalysisIndicator[];
   };
+  breakEven: {
+    sales: number;
+    variableCosts: number;
+    fixedCosts: number;
+    marginalProfitRatio: number | null;
+    breakEvenSales: number | null;
+    marginOfSafetyRatio: number | null;
+  };
   yoy: AnalysisYoyRow[];
 }
 
