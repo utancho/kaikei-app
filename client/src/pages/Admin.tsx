@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2, KeyRound, Copy, X, Check, ScrollText } from "lucide-react";
+import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2, KeyRound, Copy, X, Check, ScrollText, ShieldOff } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatYen } from "../lib/format";
 import type { AdminBusiness, AdminStats, AdminUser, AuditLog, SubscriptionStatus } from "../lib/types";
@@ -208,6 +208,23 @@ export default function Admin() {
     }
   };
 
+  const handleDisable2FA = async (target: AdminUser) => {
+    const ok = await confirm({
+      title: "二要素認証を解除しますか?",
+      description: `${target.email} の二要素認証を解除します。認証アプリを紛失した場合の復旧用です。`,
+      danger: true,
+      confirmLabel: "解除する",
+    });
+    if (!ok) return;
+    try {
+      await api.adminDisableTwoFactor(target.id);
+      toast.success(`${target.email} の二要素認証を解除しました`);
+      load();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "解除に失敗しました");
+    }
+  };
+
   const copyPassword = async () => {
     if (!resetResult) return;
     try {
@@ -406,6 +423,15 @@ export default function Admin() {
                           >
                             <KeyRound size={15} />
                           </button>
+                          {u.twoFactorEnabled && (
+                            <button
+                              className="text-amber-500 hover:text-red-600 shrink-0"
+                              title="二要素認証を解除(紛失時の復旧)"
+                              onClick={() => handleDisable2FA(u)}
+                            >
+                              <ShieldOff size={15} />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>

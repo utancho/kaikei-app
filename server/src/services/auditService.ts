@@ -6,7 +6,9 @@ export type AuditAction =
   | "SIGNUP"
   | "PASSWORD_RESET"
   | "ROLE_CHANGE"
-  | "SUBSCRIPTION_CHANGE";
+  | "SUBSCRIPTION_CHANGE"
+  | "TWO_FACTOR_ENABLED"
+  | "TWO_FACTOR_DISABLED";
 
 export interface AuditContext {
   ipAddress?: string | null;

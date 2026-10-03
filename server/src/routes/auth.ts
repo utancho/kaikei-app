@@ -1,9 +1,17 @@
 import { Hono } from "hono";
 import { setCookie, deleteCookie } from "hono/cookie";
 import { AUTH_COOKIE_NAME } from "../lib/auth.js";
-import { forgotPasswordSchema, loginInputSchema, resetPasswordSchema, signupInputSchema } from "../lib/zodSchemas.js";
+import {
+  forgotPasswordSchema,
+  loginInputSchema,
+  resetPasswordSchema,
+  signupInputSchema,
+  twoFactorDisableSchema,
+  twoFactorEnableSchema,
+} from "../lib/zodSchemas.js";
 import { getMe, login, signup } from "../services/authService.js";
 import { requestPasswordReset, resetPasswordWithToken } from "../services/passwordResetService.js";
+import { disableTwoFactor, enableTwoFactor, setupTwoFactor } from "../services/twoFactorService.js";
 import { requireAuth } from "../middleware/auth.js";
 import type { AppEnv } from "../types/env.js";
 import type { Context } from "hono";
@@ -40,9 +48,12 @@ authRouter.post("/signup", async (c) => {
 
 authRouter.post("/login", async (c) => {
   const input = loginInputSchema.parse(await c.req.json());
-  const { user, token } = await login(input.email, input.password, c.env.JWT_SECRET, auditContext(c));
-  setSessionCookie(c, token);
-  return c.json({ user });
+  const result = await login(input.email, input.password, c.env.JWT_SECRET, input.code, auditContext(c));
+  if ("twoFactorRequired" in result) {
+    return c.json({ twoFactorRequired: true });
+  }
+  setSessionCookie(c, result.token);
+  return c.json({ user: result.user });
 });
 
 authRouter.post("/forgot-password", async (c) => {
@@ -56,6 +67,20 @@ authRouter.post("/reset-password", async (c) => {
   const { token, password } = resetPasswordSchema.parse(await c.req.json());
   await resetPasswordWithToken(token, password, auditContext(c));
   return c.json({ ok: true });
+});
+
+authRouter.post("/2fa/setup", requireAuth, async (c) => {
+  return c.json(await setupTwoFactor(c.get("userId")));
+});
+
+authRouter.post("/2fa/enable", requireAuth, async (c) => {
+  const { code } = twoFactorEnableSchema.parse(await c.req.json());
+  return c.json(await enableTwoFactor(c.get("userId"), code, auditContext(c)));
+});
+
+authRouter.post("/2fa/disable", requireAuth, async (c) => {
+  const { password } = twoFactorDisableSchema.parse(await c.req.json());
+  return c.json(await disableTwoFactor(c.get("userId"), password, auditContext(c)));
 });
 
 authRouter.post("/logout", (c) => {

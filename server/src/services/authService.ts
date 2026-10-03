@@ -1,11 +1,24 @@
 import { prisma } from "../lib/prisma.js";
 import { badRequest } from "../lib/httpError.js";
 import { hashPassword, signToken, verifyPassword } from "../lib/auth.js";
+import { verifyTOTP } from "../lib/totp.js";
 import { activatePendingInvites } from "./memberService.js";
 import { recordAudit, type AuditContext } from "./auditService.js";
 
-function sanitizeUser(user: { id: string; email: string; name: string | null; role: string }) {
-  return { id: user.id, email: user.email, name: user.name, role: user.role };
+function sanitizeUser(user: {
+  id: string;
+  email: string;
+  name: string | null;
+  role: string;
+  twoFactorEnabled?: boolean;
+}) {
+  return {
+    id: user.id,
+    email: user.email,
+    name: user.name,
+    role: user.role,
+    twoFactorEnabled: Boolean(user.twoFactorEnabled),
+  };
 }
 
 export async function signup(
@@ -37,7 +50,13 @@ export async function signup(
   return { user: sanitizeUser(user), token };
 }
 
-export async function login(email: string, password: string, jwtSecret: string, context?: AuditContext) {
+export async function login(
+  email: string,
+  password: string,
+  jwtSecret: string,
+  code?: string,
+  context?: AuditContext
+) {
   const user = await prisma.user.findUnique({ where: { email } });
   if (!user) {
     await recordAudit({ action: "LOGIN_FAILED", userEmail: email, detail: "ユーザーが存在しません", context });
@@ -48,6 +67,18 @@ export async function login(email: string, password: string, jwtSecret: string, 
   if (!ok) {
     await recordAudit({ action: "LOGIN_FAILED", userId: user!.id, userEmail: email, detail: "パスワード不一致", context });
     badRequest("メールアドレスまたはパスワードが正しくありません");
+  }
+
+  // 二要素認証が有効な場合は、認証コードの入力・検証を必須にする。
+  if (user!.twoFactorEnabled) {
+    if (!code) {
+      return { twoFactorRequired: true as const };
+    }
+    const codeOk = user!.twoFactorSecret ? await verifyTOTP(user!.twoFactorSecret, code) : false;
+    if (!codeOk) {
+      await recordAudit({ action: "LOGIN_FAILED", userId: user!.id, userEmail: email, detail: "2FAコード不一致", context });
+      badRequest("認証コードが正しくありません");
+    }
   }
 
   await recordAudit({ action: "LOGIN_SUCCESS", userId: user!.id, userEmail: user!.email, context });

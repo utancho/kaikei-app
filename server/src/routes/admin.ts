@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import Stripe from "stripe";
 import { z } from "zod";
 import {
+  adminDisableTwoFactor,
   adminResetUserPassword,
   getStats,
   listAllBusinesses,
@@ -61,5 +62,10 @@ const resetPasswordSchema = z.object({
 adminRouter.post("/users/:id/reset-password", async (c) => {
   const { password } = resetPasswordSchema.parse(await c.req.json().catch(() => ({})));
   const result = await adminResetUserPassword(c.req.param("id"), password, c.get("userId"));
+  return c.json(result);
+});
+
+adminRouter.post("/users/:id/disable-2fa", async (c) => {
+  const result = await adminDisableTwoFactor(c.req.param("id"), c.get("userId"));
   return c.json(result);
 });

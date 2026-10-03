@@ -84,12 +84,20 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ email, password, name }),
     }),
-  login: (email: string, password: string) =>
-    request<{ user: { id: string; email: string; name: string | null; role: string } }>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    }),
+  login: (email: string, password: string, code?: string) =>
+    request<{ user?: { id: string; email: string; name: string | null; role: string }; twoFactorRequired?: boolean }>(
+      "/auth/login",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, password, ...(code ? { code } : {}) }),
+      }
+    ),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
+  twoFactorSetup: () => request<{ secret: string; otpauthUrl: string }>("/auth/2fa/setup", { method: "POST" }),
+  twoFactorEnable: (code: string) =>
+    request<{ enabled: boolean }>("/auth/2fa/enable", { method: "POST", body: JSON.stringify({ code }) }),
+  twoFactorDisable: (password: string) =>
+    request<{ enabled: boolean }>("/auth/2fa/disable", { method: "POST", body: JSON.stringify({ password }) }),
   forgotPassword: (email: string) =>
     request<{ ok: boolean; emailEnabled: boolean }>("/auth/forgot-password", {
       method: "POST",
@@ -102,7 +110,7 @@ export const api = {
     }),
   me: () =>
     request<{
-      user: { id: string; email: string; name: string | null; role: string };
+      user: { id: string; email: string; name: string | null; role: string; twoFactorEnabled?: boolean };
       subscription: { status: string; currentPeriodEnd: string | null } | null;
     }>("/auth/me"),
 
@@ -300,6 +308,8 @@ export const api = {
       body: JSON.stringify(password ? { password } : {}),
     }),
   adminListAuditLogs: (limit = 100) => request<AuditLog[]>(`/admin/audit-logs${qs({ limit: String(limit) })}`),
+  adminDisableTwoFactor: (userId: string) =>
+    request<{ email: string; enabled: boolean }>(`/admin/users/${userId}/disable-2fa`, { method: "POST" }),
 };
 
 export { ApiError };

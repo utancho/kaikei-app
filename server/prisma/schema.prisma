@@ -15,12 +15,14 @@ datasource db {
 // アカウント(ログインユーザー)・課金
 // ---------------------------------------------------------------------------
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  role         String   @default("USER") // USER | ADMIN
-  createdAt    DateTime @default(now())
+  id               String   @id @default(cuid())
+  email            String   @unique
+  passwordHash     String
+  name             String?
+  role             String   @default("USER") // USER | ADMIN
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?
+  createdAt        DateTime @default(now())
 
   businesses   Business[]
   subscription Subscription?

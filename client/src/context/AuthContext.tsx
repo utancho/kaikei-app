@@ -7,6 +7,7 @@ interface AuthUser {
   email: string;
   name: string | null;
   role: string;
+  twoFactorEnabled?: boolean;
 }
 
 interface SubscriptionInfo {
@@ -19,7 +20,7 @@ interface AuthContextValue {
   subscription: SubscriptionInfo | null;
   loading: boolean;
   isSubscriptionActive: boolean;
-  login: (email: string, password: string) => Promise<void>;
+  login: (email: string, password: string, code?: string) => Promise<{ twoFactorRequired: boolean }>;
   signup: (email: string, password: string, name?: string) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -51,9 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refresh();
   }, [refresh]);
 
-  const login = async (email: string, password: string) => {
-    await api.login(email, password);
+  const login = async (email: string, password: string, code?: string) => {
+    const res = await api.login(email, password, code);
+    if (res.twoFactorRequired) {
+      return { twoFactorRequired: true };
+    }
     await refresh();
+    return { twoFactorRequired: false };
   };
 
   const signup = async (email: string, password: string, name?: string) => {

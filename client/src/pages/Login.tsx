@@ -12,6 +12,8 @@ export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [twoFactor, setTwoFactor] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -20,7 +22,12 @@ export default function Login() {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
+      const res = await login(email, password, twoFactor ? code : undefined);
+      if (res.twoFactorRequired) {
+        setTwoFactor(true);
+        setLoading(false);
+        return;
+      }
       navigate("/");
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "ログインに失敗しました");
@@ -43,16 +50,36 @@ export default function Login() {
           <h1 className="text-lg font-bold text-gray-900 mb-6 text-center">ログイン</h1>
           {error && <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg border border-red-200 mb-4">{error}</div>}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className={labelClass}>メールアドレス</label>
-              <input type="email" required className={`${inputClass} w-full`} value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <div>
-              <label className={labelClass}>パスワード</label>
-              <input type="password" required className={`${inputClass} w-full`} value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
+            {!twoFactor ? (
+              <>
+                <div>
+                  <label className={labelClass}>メールアドレス</label>
+                  <input type="email" required className={`${inputClass} w-full`} value={email} onChange={(e) => setEmail(e.target.value)} />
+                </div>
+                <div>
+                  <label className={labelClass}>パスワード</label>
+                  <input type="password" required className={`${inputClass} w-full`} value={password} onChange={(e) => setPassword(e.target.value)} />
+                </div>
+              </>
+            ) : (
+              <div>
+                <label className={labelClass}>認証コード(6桁)</label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoFocus
+                  maxLength={6}
+                  placeholder="000000"
+                  required
+                  className={`${inputClass} w-full tracking-[0.4em] text-center text-lg`}
+                  value={code}
+                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                />
+                <p className="text-xs text-gray-500 mt-1.5">認証アプリに表示されている6桁のコードを入力してください。</p>
+              </div>
+            )}
             <Button type="submit" className="w-full justify-center" loading={loading}>
-              ログイン
+              {twoFactor ? "認証して続行" : "ログイン"}
             </Button>
           </form>
           <p className="text-sm text-center mt-4">

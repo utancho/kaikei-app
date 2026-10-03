@@ -489,6 +489,7 @@ export interface AdminUser {
   email: string;
   name: string | null;
   role: string;
+  twoFactorEnabled?: boolean;
   createdAt: string;
   businesses: { id: string; name: string; type: "INDIVIDUAL" | "CORPORATE" }[];
   subscription: {

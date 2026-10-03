@@ -19,6 +19,7 @@ export async function listUsers() {
     email: u.email,
     name: u.name,
     role: u.role,
+    twoFactorEnabled: u.twoFactorEnabled,
     createdAt: u.createdAt,
     businesses: u.businesses,
     subscription: u.subscription
@@ -137,6 +138,22 @@ export async function adminResetUserPassword(targetUserId: string, password?: st
   });
 
   return { email: user!.email, password: newPassword, generated: !(password && password.length > 0) };
+}
+
+/** 管理者がロックアウトされたユーザーの二要素認証を解除する(復旧用)。 */
+export async function adminDisableTwoFactor(targetUserId: string, actingUserId?: string) {
+  const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!user) notFound("対象ユーザーが見つかりません");
+  if (!user!.twoFactorEnabled) badRequest("このユーザーは二要素認証が有効ではありません");
+
+  await prisma.user.update({ where: { id: targetUserId }, data: { twoFactorEnabled: false, twoFactorSecret: null } });
+  await recordAudit({
+    action: "TWO_FACTOR_DISABLED",
+    userId: actingUserId ?? null,
+    userEmail: user!.email,
+    detail: "管理者による解除",
+  });
+  return { email: user!.email, enabled: false };
 }
 
 export async function listAllBusinesses() {

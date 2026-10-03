@@ -11,6 +11,7 @@ import { Badge } from "../components/ui/Badge";
 import { useToast } from "../components/ui/Toast";
 import { useConfirm } from "../components/ui/ConfirmDialog";
 import { inputClass, selectClass, labelClass } from "../lib/formStyles";
+import { TwoFactorSettings } from "../components/TwoFactorSettings";
 
 const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
   TRIALING: "無料お試し期間中",
@@ -162,6 +163,8 @@ export default function Settings() {
           お支払い方法・プランを管理
         </Button>
       </Card>
+
+      <TwoFactorSettings />
 
       {currentBusiness && (
         <Card className="p-5 space-y-4">

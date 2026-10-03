@@ -23,9 +23,18 @@ export const resetPasswordSchema = z.object({
   password: z.string().min(8, "パスワードは8文字以上で入力してください"),
 });
 
+export const twoFactorEnableSchema = z.object({
+  code: z.string().min(6).max(8),
+});
+
+export const twoFactorDisableSchema = z.object({
+  password: z.string().min(1),
+});
+
 export const loginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  code: z.string().optional(),
 });
 
 export const businessInputSchema = z.object({
