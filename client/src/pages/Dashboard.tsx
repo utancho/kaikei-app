@@ -1,11 +1,24 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Area, AreaChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Wallet, TrendingUp, TrendingDown, PlusCircle, ArrowRight, Receipt } from "lucide-react";
+import {
+  Wallet,
+  TrendingUp,
+  TrendingDown,
+  PlusCircle,
+  ArrowRight,
+  Receipt,
+  FileClock,
+  AlertTriangle,
+  FilePen,
+  CheckCircle2,
+  ArrowUpRight,
+  ArrowDownRight,
+} from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { api } from "../lib/api";
 import { formatDate, formatYen } from "../lib/format";
-import type { JournalEntry, ProfitLoss } from "../lib/types";
+import type { Invoice, JournalEntry, MonthlyTrendPoint, ProfitLoss } from "../lib/types";
 import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -44,6 +57,9 @@ export default function Dashboard() {
   const [cashTotal, setCashTotal] = useState(0);
   const [cashTrend, setCashTrend] = useState<{ month: string; balance: number }[]>([]);
   const [recentEntries, setRecentEntries] = useState<JournalEntry[]>([]);
+  const [draftCount, setDraftCount] = useState(0);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [monthlyTrend, setMonthlyTrend] = useState<MonthlyTrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -54,17 +70,44 @@ export default function Dashboard() {
       api.getTrialBalance(currentBusiness.id),
       api.listJournalEntries(currentBusiness.id),
       api.getCashTrend(currentBusiness.id, 6),
+      api.listInvoices(currentBusiness.id),
+      api.getMonthlyTrend(currentBusiness.id, 13),
     ])
-      .then(([plData, tb, entries, trend]) => {
+      .then(([plData, tb, entries, trend, invoiceList, trend13]) => {
         setPl(plData);
         setCashTotal(
           tb.rows.filter((r) => ["現金", "普通預金", "当座預金", "小口現金", "定期預金"].includes(r.name)).reduce((s, r) => s + r.balance, 0)
         );
         setRecentEntries(entries.slice(0, 6));
+        setDraftCount(entries.filter((e) => e.status === "DRAFT").length);
+        setInvoices(invoiceList);
+        setMonthlyTrend(trend13);
         setCashTrend(trend);
       })
       .finally(() => setLoading(false));
   }, [currentBusiness]);
+
+  const unpaidInvoices = useMemo(() => invoices.filter((iv) => iv.status === "SENT"), [invoices]);
+  const unpaidTotal = useMemo(() => unpaidInvoices.reduce((s, iv) => s + iv.total, 0), [unpaidInvoices]);
+  const overdueCount = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    return unpaidInvoices.filter((iv) => iv.dueDate && iv.dueDate.slice(0, 10) < today).length;
+  }, [unpaidInvoices]);
+
+  const monthComparison = useMemo(() => {
+    if (monthlyTrend.length === 0) return null;
+    const current = monthlyTrend[monthlyTrend.length - 1];
+    const prevMonth = monthlyTrend.length >= 2 ? monthlyTrend[monthlyTrend.length - 2] : null;
+    const prevYear = monthlyTrend.length >= 13 ? monthlyTrend[monthlyTrend.length - 13] : null;
+    const pct = (cur: number, base: number | undefined) =>
+      base === undefined || base === 0 ? null : ((cur - base) / Math.abs(base)) * 100;
+    return {
+      month: current.month,
+      sales: current.sales,
+      momPct: pct(current.sales, prevMonth?.sales),
+      yoyPct: pct(current.sales, prevYear?.sales),
+    };
+  }, [monthlyTrend]);
 
   const expenseBreakdown = useMemo(() => {
     if (!pl) return [];
@@ -112,6 +155,76 @@ export default function Dashboard() {
           value={formatYen(netIncome)}
           tone={netIncome < 0 ? "negative" : "default"}
         />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <Card className="lg:col-span-2">
+          <CardHeader title="やること" subtitle="対応が必要な項目" />
+          <div className="divide-y divide-gray-100">
+            {unpaidInvoices.length === 0 && draftCount === 0 ? (
+              <div className="flex items-center gap-2 px-5 py-6 text-sm text-gray-500">
+                <CheckCircle2 size={18} className="text-emerald-500" />
+                対応が必要な項目はありません
+              </div>
+            ) : (
+              <>
+                {unpaidInvoices.length > 0 && (
+                  <Link to="/invoices" className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${overdueCount > 0 ? "bg-red-50 text-red-500" : "bg-amber-50 text-amber-500"}`}>
+                      {overdueCount > 0 ? <AlertTriangle size={17} /> : <FileClock size={17} />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-gray-800">
+                        未入金の請求書 {unpaidInvoices.length}件
+                        {overdueCount > 0 && <span className="text-red-500 ml-1.5">(期限超過 {overdueCount}件)</span>}
+                      </div>
+                      <div className="text-xs text-gray-400">合計 {formatYen(unpaidTotal)}</div>
+                    </div>
+                    <ArrowRight size={15} className="text-gray-300 shrink-0" />
+                  </Link>
+                )}
+                {draftCount > 0 && (
+                  <Link to="/journal-entries" className="flex items-center gap-3 px-5 py-3 hover:bg-gray-50">
+                    <div className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0 bg-sky-50 text-sky-500">
+                      <FilePen size={17} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium text-gray-800">下書きの仕訳 {draftCount}件</div>
+                      <div className="text-xs text-gray-400">内容を確認して確定しましょう</div>
+                    </div>
+                    <ArrowRight size={15} className="text-gray-300 shrink-0" />
+                  </Link>
+                )}
+              </>
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <CardHeader title="今月の売上" subtitle={monthComparison?.month ?? ""} />
+          <div className="p-5">
+            <div className="text-2xl font-bold text-gray-900 tabular-nums">{formatYen(monthComparison?.sales ?? 0)}</div>
+            <div className="mt-3 space-y-1.5">
+              {[
+                { label: "前月比", pct: monthComparison?.momPct ?? null },
+                { label: "前年同月比", pct: monthComparison?.yoyPct ?? null },
+              ].map((row) => (
+                <div key={row.label} className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">{row.label}</span>
+                  {row.pct === null ? (
+                    <span className="text-gray-400 text-xs">—</span>
+                  ) : (
+                    <span className={`flex items-center gap-0.5 font-medium ${row.pct >= 0 ? "text-emerald-600" : "text-red-500"}`}>
+                      {row.pct >= 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
+                      {row.pct >= 0 ? "+" : ""}
+                      {row.pct.toFixed(1)}%
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

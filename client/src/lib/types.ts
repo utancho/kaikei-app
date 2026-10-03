@@ -378,6 +378,57 @@ export interface MonthlyTrendPoint {
   netIncome: number;
 }
 
+export interface AnalysisIndicator {
+  key: string;
+  label: string;
+  value: number | null;
+  previous: number | null;
+  unit: "%" | "倍" | "円";
+  higherIsBetter: boolean;
+  description: string;
+}
+
+export interface AnalysisYoyRow {
+  key: string;
+  label: string;
+  current: number;
+  previous: number;
+  changePct: number | null;
+}
+
+export interface BusinessAnalysis {
+  period: { from: string; to: string };
+  previousPeriod: { from: string; to: string };
+  hasData: boolean;
+  hasPrevious: boolean;
+  summary: {
+    sales: number;
+    operatingIncome: number;
+    ordinaryIncome: number;
+    netIncome: number;
+    totalAssets: number;
+    totalEquity: number;
+  };
+  indicators: {
+    profitability: AnalysisIndicator[];
+    safety: AnalysisIndicator[];
+    efficiency: AnalysisIndicator[];
+  };
+  yoy: AnalysisYoyRow[];
+}
+
+export interface JournalImportEntry {
+  entryDate: string;
+  description?: string | null;
+  lines: { side: EntrySide; accountName: string; amount: number }[];
+}
+
+export interface JournalImportResult {
+  total: number;
+  created: number;
+  errors: { row: number; message: string }[];
+}
+
 export interface BankImportBatch {
   id: string;
   businessId: string;

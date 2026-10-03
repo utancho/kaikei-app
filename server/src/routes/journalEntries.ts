@@ -1,10 +1,11 @@
 import { Hono } from "hono";
 import { requireBusinessId, parseDateParam } from "../lib/requestHelpers.js";
-import { journalEntryInputSchema } from "../lib/zodSchemas.js";
+import { journalEntryInputSchema, journalImportInputSchema } from "../lib/zodSchemas.js";
 import {
   createJournalEntry,
   deleteJournalEntry,
   getJournalEntry,
+  importJournalEntries,
   listJournalEntries,
   updateJournalEntry,
 } from "../services/journalEntryService.js";
@@ -21,6 +22,13 @@ journalEntriesRouter.get("/", async (c) => {
     keyword: c.req.query("keyword"),
   });
   return c.json(entries);
+});
+
+journalEntriesRouter.post("/import", async (c) => {
+  const businessId = requireBusinessId(c);
+  const { entries } = journalImportInputSchema.parse(await c.req.json());
+  const result = await importJournalEntries(businessId, entries);
+  return c.json(result);
 });
 
 journalEntriesRouter.get("/:id", async (c) => {

@@ -320,6 +320,176 @@ export async function getMonthlyTrend(businessId: string, months: number) {
   return points;
 }
 
+interface Indicator {
+  key: string;
+  label: string;
+  value: number | null;
+  previous: number | null;
+  unit: "%" | "倍" | "円";
+  /** true のとき値が大きいほど良い指標。固定比率など小さいほど良い指標は false。 */
+  higherIsBetter: boolean;
+  description: string;
+}
+
+interface YoyRow {
+  key: string;
+  label: string;
+  current: number;
+  previous: number;
+  changePct: number | null;
+}
+
+function periodOneYearEarlier(from: Date, to: Date) {
+  return {
+    from: new Date(Date.UTC(from.getUTCFullYear() - 1, from.getUTCMonth(), from.getUTCDate())),
+    to: new Date(Date.UTC(to.getUTCFullYear() - 1, to.getUTCMonth(), to.getUTCDate())),
+  };
+}
+
+/**
+ * 経営分析レポート。当期の損益計算書・貸借対照表から収益性・安全性・効率性の
+ * 各指標を算出し、前年同期と比較する。会計データの「読み方」を提供する。
+ */
+export async function getBusinessAnalysis(businessId: string, from: Date, to: Date) {
+  const prev = periodOneYearEarlier(from, to);
+  const [pl, bs, prevPl, prevBs] = await Promise.all([
+    getProfitAndLoss(businessId, from, to),
+    getBalanceSheet(businessId, from, to),
+    getProfitAndLoss(businessId, prev.from, prev.to),
+    getBalanceSheet(businessId, prev.from, prev.to),
+  ]);
+
+  const sumBySub = (items: { subcategory: string; amount: number }[], sub: string) =>
+    items.filter((l) => l.subcategory === sub).reduce((s, l) => s + l.amount, 0);
+
+  const pct = (num: number, den: number): number | null => (den === 0 ? null : (num / den) * 100);
+  const times = (num: number, den: number): number | null => (den === 0 ? null : num / den);
+
+  const curCA = sumBySub(bs.lineItems, "流動資産");
+  const curCL = sumBySub(bs.lineItems, "流動負債");
+  const curFA = sumBySub(bs.lineItems, "固定資産");
+  const prevCA = sumBySub(prevBs.lineItems, "流動資産");
+  const prevCL = sumBySub(prevBs.lineItems, "流動負債");
+  const prevFA = sumBySub(prevBs.lineItems, "固定資産");
+
+  const profitability: Indicator[] = [
+    {
+      key: "grossMargin",
+      label: "売上総利益率",
+      value: pct(pl.summary.grossProfit, pl.summary.sales),
+      previous: pct(prevPl.summary.grossProfit, prevPl.summary.sales),
+      unit: "%",
+      higherIsBetter: true,
+      description: "売上に対する粗利益の割合。商品・サービスそのものの収益力を示します。",
+    },
+    {
+      key: "operatingMargin",
+      label: "営業利益率",
+      value: pct(pl.summary.operatingIncome, pl.summary.sales),
+      previous: pct(prevPl.summary.operatingIncome, prevPl.summary.sales),
+      unit: "%",
+      higherIsBetter: true,
+      description: "本業でどれだけ稼げているかを示す、最も重視される収益性指標です。",
+    },
+    {
+      key: "ordinaryMargin",
+      label: "経常利益率",
+      value: pct(pl.summary.ordinaryIncome, pl.summary.sales),
+      previous: pct(prevPl.summary.ordinaryIncome, prevPl.summary.sales),
+      unit: "%",
+      higherIsBetter: true,
+      description: "本業に加え、資金調達なども含めた通常の事業活動全体の収益性です。",
+    },
+    {
+      key: "netMargin",
+      label: "売上高当期純利益率",
+      value: pct(pl.summary.netIncome, pl.summary.sales),
+      previous: pct(prevPl.summary.netIncome, prevPl.summary.sales),
+      unit: "%",
+      higherIsBetter: true,
+      description: "税引後、最終的に手元に残る利益の割合です。",
+    },
+  ];
+
+  const safety: Indicator[] = [
+    {
+      key: "currentRatio",
+      label: "流動比率",
+      value: pct(curCA, curCL),
+      previous: pct(prevCA, prevCL),
+      unit: "%",
+      higherIsBetter: true,
+      description: "短期の支払能力。200%以上が理想、100%を下回ると資金繰りに注意が必要です。",
+    },
+    {
+      key: "equityRatio",
+      label: "自己資本比率",
+      value: pct(bs.totalEquity, bs.totalAssets),
+      previous: pct(prevBs.totalEquity, prevBs.totalAssets),
+      unit: "%",
+      higherIsBetter: true,
+      description: "総資産に占める純資産の割合。高いほど財務が安定しています(目安40%以上)。",
+    },
+    {
+      key: "fixedRatio",
+      label: "固定比率",
+      value: pct(curFA, bs.totalEquity),
+      previous: pct(prevFA, prevBs.totalEquity),
+      unit: "%",
+      higherIsBetter: false,
+      description: "固定資産を自己資本でどれだけ賄えているか。100%以下が健全です。",
+    },
+  ];
+
+  const efficiency: Indicator[] = [
+    {
+      key: "totalAssetTurnover",
+      label: "総資産回転率",
+      value: times(pl.summary.sales, bs.totalAssets),
+      previous: times(prevPl.summary.sales, prevBs.totalAssets),
+      unit: "倍",
+      higherIsBetter: true,
+      description: "資産を売上に結びつけられている度合い。高いほど資産を有効活用できています。",
+    },
+  ];
+
+  const yoyRow = (key: string, label: string, current: number, previous: number): YoyRow => ({
+    key,
+    label,
+    current,
+    previous,
+    changePct: previous === 0 ? null : ((current - previous) / Math.abs(previous)) * 100,
+  });
+
+  const yoy: YoyRow[] = [
+    yoyRow("sales", "売上高", pl.summary.sales, prevPl.summary.sales),
+    yoyRow("grossProfit", "売上総利益", pl.summary.grossProfit, prevPl.summary.grossProfit),
+    yoyRow("operatingIncome", "営業利益", pl.summary.operatingIncome, prevPl.summary.operatingIncome),
+    yoyRow("ordinaryIncome", "経常利益", pl.summary.ordinaryIncome, prevPl.summary.ordinaryIncome),
+    yoyRow("netIncome", "当期純利益", pl.summary.netIncome, prevPl.summary.netIncome),
+  ];
+
+  const hasData = pl.summary.sales !== 0 || bs.totalAssets !== 0;
+  const hasPrevious = prevPl.summary.sales !== 0 || prevBs.totalAssets !== 0;
+
+  return {
+    period: { from, to },
+    previousPeriod: prev,
+    hasData,
+    hasPrevious,
+    summary: {
+      sales: pl.summary.sales,
+      operatingIncome: pl.summary.operatingIncome,
+      ordinaryIncome: pl.summary.ordinaryIncome,
+      netIncome: pl.summary.netIncome,
+      totalAssets: bs.totalAssets,
+      totalEquity: bs.totalEquity,
+    },
+    indicators: { profitability, safety, efficiency },
+    yoy,
+  };
+}
+
 export async function getJournalBook(businessId: string, from?: Date, to?: Date) {
   return prisma.journalEntry.findMany({
     where: { businessId, status: "CONFIRMED", entryDate: { gte: from, lte: to } },

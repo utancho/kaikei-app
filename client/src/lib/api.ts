@@ -8,6 +8,7 @@ import type {
   BankTransactionRow,
   BlueReturnStatement,
   Business,
+  BusinessAnalysis,
   BusinessMemberInfo,
   BusinessMembersResponse,
   BudgetActualResponse,
@@ -19,6 +20,8 @@ import type {
   Invoice,
   JournalEntry,
   JournalEntryTemplate,
+  JournalImportEntry,
+  JournalImportResult,
   MonthlyTrendPoint,
   Partner,
   PartnerBalancesResponse,
@@ -147,6 +150,11 @@ export const api = {
     }),
   deleteJournalEntry: (businessId: string, id: string) =>
     request<void>(`/journal-entries/${id}?businessId=${businessId}`, { method: "DELETE" }),
+  importJournalEntries: (businessId: string, entries: JournalImportEntry[]) =>
+    request<JournalImportResult>(`/journal-entries/import?businessId=${businessId}`, {
+      method: "POST",
+      body: JSON.stringify({ entries }),
+    }),
 
   // Reports
   getTrialBalance: (businessId: string, from?: string, to?: string) =>
@@ -167,6 +175,8 @@ export const api = {
     request<PartnerBalancesResponse>(`/reports/partner-balances${qs({ businessId })}`),
   getMonthlyTrend: (businessId: string, months = 12) =>
     request<MonthlyTrendPoint[]>(`/reports/monthly-trend${qs({ businessId, months: String(months) })}`),
+  getBusinessAnalysis: (businessId: string, from?: string, to?: string) =>
+    request<BusinessAnalysis>(`/reports/business-analysis${qs({ businessId, from, to })}`),
 
   // Invoices
   listInvoices: (businessId: string) => request<Invoice[]>(`/invoices${qs({ businessId })}`),

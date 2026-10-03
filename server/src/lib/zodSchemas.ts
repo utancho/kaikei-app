@@ -78,6 +78,23 @@ export const journalEntryInputSchema = z.object({
   lines: z.array(journalLineInputSchema).min(2, "仕訳は借方・貸方それぞれ1行以上必要です"),
 });
 
+export const journalImportLineSchema = z.object({
+  side: z.enum(ENTRY_SIDES),
+  accountName: z.string().min(1),
+  amount: z.number().positive(),
+});
+
+export const journalImportEntrySchema = z.object({
+  // 文字列のまま受け取り、サーバ側でUTC基準の日付に正規化する(TZによる日付ズレを防ぐ)。
+  entryDate: z.string().min(1),
+  description: z.string().optional().nullable(),
+  lines: z.array(journalImportLineSchema).min(1),
+});
+
+export const journalImportInputSchema = z.object({
+  entries: z.array(journalImportEntrySchema).min(1, "取り込む仕訳がありません"),
+});
+
 export const invoiceItemInputSchema = z.object({
   description: z.string().min(1),
   quantity: z.number().positive().optional(),

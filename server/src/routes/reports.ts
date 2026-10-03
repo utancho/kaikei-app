@@ -4,6 +4,7 @@ import { requireBusinessId, parseDateParam } from "../lib/requestHelpers.js";
 import { notFound } from "../lib/httpError.js";
 import {
   getBalanceSheet,
+  getBusinessAnalysis,
   getCashTrend,
   getGeneralLedger,
   getJournalBook,
@@ -56,6 +57,12 @@ reportsRouter.get("/balance-sheet", async (c) => {
   const { from, to } = await resolvePeriod(businessId, c);
   const bs = await getBalanceSheet(businessId, from, to);
   return c.json(bs);
+});
+
+reportsRouter.get("/business-analysis", async (c) => {
+  const businessId = requireBusinessId(c);
+  const { from, to } = await resolvePeriod(businessId, c);
+  return c.json(await getBusinessAnalysis(businessId, from, to));
 });
 
 reportsRouter.get("/cash-trend", async (c) => {
