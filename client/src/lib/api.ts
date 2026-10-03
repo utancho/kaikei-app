@@ -25,6 +25,8 @@ import type {
   JournalImportResult,
   MonthlyTrendPoint,
   Partner,
+  PostAllDepreciationResult,
+  YearEndClosing,
   PartnerBalancesResponse,
   ProfitLoss,
   ReceiptExtraction,
@@ -188,6 +190,13 @@ export const api = {
     request<MonthlyTrendPoint[]>(`/reports/monthly-trend${qs({ businessId, months: String(months) })}`),
   getBusinessAnalysis: (businessId: string, from?: string, to?: string) =>
     request<BusinessAnalysis>(`/reports/business-analysis${qs({ businessId, from, to })}`),
+  getYearEndClosing: (businessId: string, fiscalYearId?: string) =>
+    request<YearEndClosing>(`/reports/year-end-closing${qs({ businessId, fiscalYearId })}`),
+  postAllDepreciation: (businessId: string, fiscalYearId?: string) =>
+    request<PostAllDepreciationResult>(`/fixed-assets/post-all-depreciation?businessId=${businessId}`, {
+      method: "POST",
+      body: JSON.stringify(fiscalYearId ? { fiscalYearId } : {}),
+    }),
 
   // Invoices
   listInvoices: (businessId: string) => request<Invoice[]>(`/invoices${qs({ businessId })}`),

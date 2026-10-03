@@ -26,6 +26,7 @@ import {
   ListTree,
   Settings as SettingsIcon,
   Repeat,
+  ClipboardCheck,
 } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { api } from "../lib/api";
@@ -62,6 +63,7 @@ const PAGES: { to: string; label: string; icon: ReactNode; keywords: string; ind
   { to: "/reports/consumption-tax", label: "消費税申告書", icon: <Percent size={16} />, keywords: "consumption tax しょうひぜい" },
   { to: "/budget", label: "予算実績管理", icon: <Target size={16} />, keywords: "budget よさん" },
   { to: "/reports/cash-flow-forecast", label: "資金繰り表", icon: <Waves size={16} />, keywords: "cash flow しきんぐり" },
+  { to: "/reports/year-end-closing", label: "決算処理", icon: <ClipboardCheck size={16} />, keywords: "closing けっさん 期末 決算" },
   { to: "/accounts", label: "勘定科目", icon: <ListTree size={16} />, keywords: "account かんじょうかもく" },
   { to: "/settings", label: "設定", icon: <SettingsIcon size={16} />, keywords: "settings せってい" },
 ];

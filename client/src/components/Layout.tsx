@@ -23,6 +23,7 @@ import {
   Contact,
   BarChart3,
   LineChart,
+  ClipboardCheck,
   LogOut,
   ShieldCheck,
   Search,
@@ -70,6 +71,7 @@ const NAV_GROUPS: { heading?: string; items: NavItem[] }[] = [
       { to: "/reports/consumption-tax", label: "消費税申告書", icon: Percent },
       { to: "/budget", label: "予算実績管理", icon: Target },
       { to: "/reports/cash-flow-forecast", label: "資金繰り表", icon: Waves },
+      { to: "/reports/year-end-closing", label: "決算処理", icon: ClipboardCheck },
     ],
   },
   {

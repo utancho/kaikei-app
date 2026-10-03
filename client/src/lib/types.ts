@@ -425,6 +425,30 @@ export interface BusinessAnalysis {
   yoy: AnalysisYoyRow[];
 }
 
+export interface YearEndClosing {
+  fiscalYear: { id: string; startDate: string; endDate: string; status: string };
+  summary: {
+    sales: number;
+    netIncome: number;
+    totalAssets: number;
+    totalLiabilitiesAndEquity: number;
+    balanced: boolean;
+  };
+  depreciation: {
+    assets: { id: string; name: string; scheduledAmount: number; posted: boolean; postedAmount: number }[];
+    pendingCount: number;
+    pendingTotal: number;
+  };
+  checklist: { key: string; label: string; status: "done" | "pending" | "info"; detail: string }[];
+}
+
+export interface PostAllDepreciationResult {
+  posted: number;
+  totalAmount: number;
+  errors: { name: string; message: string }[];
+  fiscalYearId: string;
+}
+
 export interface JournalImportEntry {
   entryDate: string;
   description?: string | null;

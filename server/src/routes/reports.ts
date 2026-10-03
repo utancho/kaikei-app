@@ -17,6 +17,7 @@ import { getOrCreateFiscalYearForDate } from "../services/fiscalYearService.js";
 import { getBlueReturnStatement } from "../services/blueReturnService.js";
 import { getConsumptionTaxReturn, getSimplifiedTaxCategories } from "../services/consumptionTaxService.js";
 import { getCashFlowForecast } from "../services/budgetService.js";
+import { getYearEndClosing } from "../services/closingService.js";
 import type { AppEnv } from "../types/env.js";
 
 export const reportsRouter = new Hono<AppEnv>();
@@ -57,6 +58,11 @@ reportsRouter.get("/balance-sheet", async (c) => {
   const { from, to } = await resolvePeriod(businessId, c);
   const bs = await getBalanceSheet(businessId, from, to);
   return c.json(bs);
+});
+
+reportsRouter.get("/year-end-closing", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await getYearEndClosing(businessId, c.req.query("fiscalYearId")));
 });
 
 reportsRouter.get("/business-analysis", async (c) => {

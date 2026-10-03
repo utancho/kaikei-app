@@ -38,6 +38,7 @@ const ReceiptScan = lazy(() => import("./pages/ReceiptScan"));
 const PartnerBalances = lazy(() => import("./pages/PartnerBalances"));
 const MonthlyTrend = lazy(() => import("./pages/MonthlyTrend"));
 const ManagementAnalysis = lazy(() => import("./pages/ManagementAnalysis"));
+const YearEndClosing = lazy(() => import("./pages/YearEndClosing"));
 const Admin = lazy(() => import("./pages/Admin"));
 const CommercialTransactions = lazy(() => import("./pages/legal/CommercialTransactions"));
 const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
@@ -95,6 +96,7 @@ function WorkspaceRoutes() {
         <Route path="/receipt-scan" element={<ReceiptScan />} />
         <Route path="/reports/monthly-trend" element={<MonthlyTrend />} />
         <Route path="/reports/management-analysis" element={<ManagementAnalysis />} />
+        <Route path="/reports/year-end-closing" element={<YearEndClosing />} />
         <Route path="/reports/partner-balances" element={<PartnerBalances />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />

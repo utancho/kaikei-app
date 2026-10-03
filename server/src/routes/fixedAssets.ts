@@ -9,9 +9,16 @@ import {
   listFixedAssets,
   postDepreciationForFiscalYear,
 } from "../services/fixedAssetService.js";
+import { postAllDepreciation } from "../services/closingService.js";
 import type { AppEnv } from "../types/env.js";
 
 export const fixedAssetsRouter = new Hono<AppEnv>();
+
+fixedAssetsRouter.post("/post-all-depreciation", async (c) => {
+  const businessId = requireBusinessId(c);
+  const { fiscalYearId } = (await c.req.json().catch(() => ({}))) as { fiscalYearId?: string };
+  return c.json(await postAllDepreciation(businessId, fiscalYearId));
+});
 
 fixedAssetsRouter.get("/", async (c) => {
   const businessId = requireBusinessId(c);
