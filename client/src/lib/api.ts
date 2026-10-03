@@ -88,6 +88,16 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
+  forgotPassword: (email: string) =>
+    request<{ ok: boolean; emailEnabled: boolean }>("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    }),
+  resetPassword: (token: string, password: string) =>
+    request<{ ok: boolean }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
+    }),
   me: () =>
     request<{
       user: { id: string; email: string; name: string | null; role: string };

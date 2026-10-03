@@ -55,6 +55,11 @@ export default function Login() {
               ログイン
             </Button>
           </form>
+          <p className="text-sm text-center mt-4">
+            <Link to="/forgot-password" className="text-gray-500 hover:text-brand-600 hover:underline">
+              パスワードをお忘れですか?
+            </Link>
+          </p>
           <p className="text-sm text-gray-500 text-center mt-6">
             アカウントをお持ちでない方は{" "}
             <Link to="/signup" className="text-brand-600 hover:underline font-medium">

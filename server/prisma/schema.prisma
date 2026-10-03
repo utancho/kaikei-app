@@ -27,6 +27,17 @@ model User {
   memberships  BusinessMember[]
 }
 
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
 model AuditLog {
   id        String   @id @default(cuid())
   userId    String?

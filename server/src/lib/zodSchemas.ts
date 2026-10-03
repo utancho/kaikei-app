@@ -14,6 +14,15 @@ export const signupInputSchema = z.object({
   name: z.string().optional(),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("有効なメールアドレスを入力してください"),
+});
+
+export const resetPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8, "パスワードは8文字以上で入力してください"),
+});
+
 export const loginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1),

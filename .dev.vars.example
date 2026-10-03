@@ -10,3 +10,9 @@ APP_URL="http://localhost:5173"
 # STRIPE_SECRET_KEY="sk_test_..."
 # STRIPE_PRICE_ID="price_..."
 # STRIPE_WEBHOOK_SECRET="whsec_..."
+
+# メール送信(パスワード再設定の自己復旧・請求書メール送信を使う場合のみ)
+# Resend(https://resend.com)のAPIキーと送信元アドレスを設定します。
+# 未設定の場合、メール機能は「準備中」として無効化され、他機能は通常どおり動作します。
+# RESEND_API_KEY="re_..."
+# MAIL_FROM="Kaikei <noreply@yourdomain.com>"

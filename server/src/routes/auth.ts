@@ -1,8 +1,9 @@
 import { Hono } from "hono";
 import { setCookie, deleteCookie } from "hono/cookie";
 import { AUTH_COOKIE_NAME } from "../lib/auth.js";
-import { loginInputSchema, signupInputSchema } from "../lib/zodSchemas.js";
+import { forgotPasswordSchema, loginInputSchema, resetPasswordSchema, signupInputSchema } from "../lib/zodSchemas.js";
 import { getMe, login, signup } from "../services/authService.js";
+import { requestPasswordReset, resetPasswordWithToken } from "../services/passwordResetService.js";
 import { requireAuth } from "../middleware/auth.js";
 import type { AppEnv } from "../types/env.js";
 import type { Context } from "hono";
@@ -42,6 +43,19 @@ authRouter.post("/login", async (c) => {
   const { user, token } = await login(input.email, input.password, c.env.JWT_SECRET, auditContext(c));
   setSessionCookie(c, token);
   return c.json({ user });
+});
+
+authRouter.post("/forgot-password", async (c) => {
+  const { email } = forgotPasswordSchema.parse(await c.req.json());
+  const result = await requestPasswordReset(c.env, email, auditContext(c));
+  // ユーザー存在有無は返さない(列挙攻撃対策)。emailEnabled のみ返す。
+  return c.json({ ok: true, emailEnabled: result.emailEnabled });
+});
+
+authRouter.post("/reset-password", async (c) => {
+  const { token, password } = resetPasswordSchema.parse(await c.req.json());
+  await resetPasswordWithToken(token, password, auditContext(c));
+  return c.json({ ok: true });
 });
 
 authRouter.post("/logout", (c) => {
