@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2 } from "lucide-react";
+import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2, KeyRound, Copy, X, Check } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatYen } from "../lib/format";
 import type { AdminBusiness, AdminStats, AdminUser, SubscriptionStatus } from "../lib/types";
@@ -9,10 +9,12 @@ import { useAuth } from "../context/AuthContext";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
+import { Button } from "../components/ui/Button";
 import { TableSkeleton } from "../components/ui/Skeleton";
 import { EmptyState } from "../components/ui/EmptyState";
 import { inputClass, selectClass } from "../lib/formStyles";
 import { useToast } from "../components/ui/Toast";
+import { useConfirm } from "../components/ui/ConfirmDialog";
 
 const STATUS_LABELS: Record<SubscriptionStatus, string> = {
   NONE: "未契約",
@@ -117,6 +119,7 @@ function exportUsersCsv(users: AdminUser[]) {
 
 export default function Admin() {
   const toast = useToast();
+  const confirm = useConfirm();
   const { user, logout } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -124,6 +127,8 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatus | "ALL">("ALL");
+  const [resetResult, setResetResult] = useState<{ email: string; password: string } | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -161,6 +166,34 @@ export default function Admin() {
       load();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "更新に失敗しました");
+    }
+  };
+
+  const handleResetPassword = async (target: AdminUser) => {
+    const ok = await confirm({
+      title: "パスワードを再設定しますか?",
+      description: `${target.email} の新しい一時パスワードを発行します。本人に安全な方法で伝え、ログイン後に変更してもらってください。`,
+      confirmLabel: "一時パスワードを発行",
+    });
+    if (!ok) return;
+    try {
+      const res = await api.adminResetPassword(target.id);
+      setResetResult({ email: res.email, password: res.password });
+      setCopied(false);
+      toast.success("パスワードを再設定しました");
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "再設定に失敗しました");
+    }
+  };
+
+  const copyPassword = async () => {
+    if (!resetResult) return;
+    try {
+      await navigator.clipboard.writeText(resetResult.password);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast.error("コピーできませんでした");
     }
   };
 
@@ -332,17 +365,26 @@ export default function Admin() {
                         <Badge tone={STATUS_TONES[u.subscription.status]}>{STATUS_LABELS[u.subscription.status]}</Badge>
                       </td>
                       <td className="px-4 py-2.5">
-                        <select
-                          className={`${selectClass} !py-1 !text-xs w-32`}
-                          value={u.subscription.status}
-                          onChange={(e) => handleStatusChange(u.id, e.target.value as SubscriptionStatus)}
-                        >
-                          {STATUS_OPTIONS.map((s) => (
-                            <option key={s} value={s}>
-                              {STATUS_LABELS[s]}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center gap-2">
+                          <select
+                            className={`${selectClass} !py-1 !text-xs w-32`}
+                            value={u.subscription.status}
+                            onChange={(e) => handleStatusChange(u.id, e.target.value as SubscriptionStatus)}
+                          >
+                            {STATUS_OPTIONS.map((s) => (
+                              <option key={s} value={s}>
+                                {STATUS_LABELS[s]}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            className="text-gray-400 hover:text-brand-600 shrink-0"
+                            title="パスワードを再設定(一時パスワード発行)"
+                            onClick={() => handleResetPassword(u)}
+                          >
+                            <KeyRound size={15} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -395,6 +437,39 @@ export default function Admin() {
           )}
         </Card>
       </div>
+
+      {resetResult && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 px-4" onClick={() => setResetResult(null)}>
+          <div className="bg-white rounded-xl shadow-lg border w-full max-w-md p-5 animate-[modal-in_0.12s_ease-out]" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                <KeyRound size={18} className="text-brand-600" /> 一時パスワードを発行しました
+              </h3>
+              <button className="text-gray-400 hover:text-gray-600" onClick={() => setResetResult(null)}>
+                <X size={16} />
+              </button>
+            </div>
+            <p className="text-sm text-gray-600">
+              <span className="font-medium">{resetResult.email}</span> の新しいパスワードです。
+              この画面を閉じると再表示できません。安全な方法で本人に伝えてください。
+            </p>
+            <div className="mt-3 flex items-center gap-2">
+              <code className="flex-1 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-base font-mono tracking-wide text-gray-900 select-all">
+                {resetResult.password}
+              </code>
+              <Button variant="secondary" icon={copied ? <Check size={14} /> : <Copy size={14} />} onClick={copyPassword}>
+                {copied ? "コピー済" : "コピー"}
+              </Button>
+            </div>
+            <div className="mt-4 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+              セキュリティのため、ログイン後に本人がパスワードを変更することを推奨してください。
+            </div>
+            <div className="flex justify-end mt-5">
+              <Button onClick={() => setResetResult(null)}>閉じる</Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

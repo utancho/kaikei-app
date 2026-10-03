@@ -1,7 +1,14 @@
 import { Hono } from "hono";
 import Stripe from "stripe";
 import { z } from "zod";
-import { getStats, listAllBusinesses, listUsers, updateUserRole, updateUserSubscription } from "../services/adminService.js";
+import {
+  adminResetUserPassword,
+  getStats,
+  listAllBusinesses,
+  listUsers,
+  updateUserRole,
+  updateUserSubscription,
+} from "../services/adminService.js";
 import type { AppEnv } from "../types/env.js";
 
 export const adminRouter = new Hono<AppEnv>();
@@ -39,4 +46,14 @@ adminRouter.patch("/users/:id/role", async (c) => {
   const { role } = updateRoleSchema.parse(await c.req.json());
   const user = await updateUserRole(c.get("userId"), c.req.param("id"), role);
   return c.json(user);
+});
+
+const resetPasswordSchema = z.object({
+  password: z.string().min(8, "パスワードは8文字以上で入力してください").optional(),
+});
+
+adminRouter.post("/users/:id/reset-password", async (c) => {
+  const { password } = resetPasswordSchema.parse(await c.req.json().catch(() => ({})));
+  const result = await adminResetUserPassword(c.req.param("id"), password);
+  return c.json(result);
 });

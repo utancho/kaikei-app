@@ -274,6 +274,11 @@ export const api = {
     request<void>(`/admin/users/${userId}/subscription`, { method: "PATCH", body: JSON.stringify({ status }) }),
   adminUpdateRole: (userId: string, role: "USER" | "ADMIN") =>
     request<void>(`/admin/users/${userId}/role`, { method: "PATCH", body: JSON.stringify({ role }) }),
+  adminResetPassword: (userId: string, password?: string) =>
+    request<{ email: string; password: string; generated: boolean }>(`/admin/users/${userId}/reset-password`, {
+      method: "POST",
+      body: JSON.stringify(password ? { password } : {}),
+    }),
 };
 
 export { ApiError };

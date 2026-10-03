@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
 import { badRequest, notFound } from "../lib/httpError.js";
+import { hashPassword } from "../lib/auth.js";
 
 const SUBSCRIPTION_STATUSES = new Set(["NONE", "TRIALING", "ACTIVE", "PAST_DUE", "CANCELED"]);
 
@@ -85,6 +86,34 @@ export async function updateUserRole(actingUserId: string, targetUserId: string,
   if (!existing) notFound("対象ユーザーが見つかりません");
 
   return prisma.user.update({ where: { id: targetUserId }, data: { role } });
+}
+
+/** 紛らわしい文字(0/O/1/l/I)を除いた安全なランダムパスワードを生成する。 */
+function generateTempPassword(length = 12): string {
+  const charset = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+  const bytes = new Uint8Array(length);
+  crypto.getRandomValues(bytes);
+  let out = "";
+  for (let i = 0; i < length; i++) out += charset[bytes[i] % charset.length];
+  return out;
+}
+
+/**
+ * 管理者がロックアウトされたユーザーのパスワードを再設定する(権限制御済みの正規運用)。
+ * password 未指定時は一時パスワードを生成して返す。ユーザーには別経路で安全に伝え、
+ * 次回ログイン後に本人がパスワード変更することを推奨する。
+ */
+export async function adminResetUserPassword(targetUserId: string, password?: string) {
+  const user = await prisma.user.findUnique({ where: { id: targetUserId } });
+  if (!user) notFound("対象ユーザーが見つかりません");
+
+  const newPassword = password && password.length > 0 ? password : generateTempPassword();
+  if (newPassword.length < 8) badRequest("パスワードは8文字以上で入力してください");
+
+  const passwordHash = await hashPassword(newPassword);
+  await prisma.user.update({ where: { id: targetUserId }, data: { passwordHash } });
+
+  return { email: user!.email, password: newPassword, generated: !(password && password.length > 0) };
 }
 
 export async function listAllBusinesses() {
