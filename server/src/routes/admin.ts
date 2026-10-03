@@ -9,6 +9,7 @@ import {
   updateUserRole,
   updateUserSubscription,
 } from "../services/adminService.js";
+import { listAuditLogs } from "../services/auditService.js";
 import type { AppEnv } from "../types/env.js";
 
 export const adminRouter = new Hono<AppEnv>();
@@ -34,8 +35,13 @@ const updateSubscriptionSchema = z.object({
 
 adminRouter.patch("/users/:id/subscription", async (c) => {
   const { status } = updateSubscriptionSchema.parse(await c.req.json());
-  const subscription = await updateUserSubscription(c.req.param("id"), status);
+  const subscription = await updateUserSubscription(c.req.param("id"), status, c.get("userId"));
   return c.json(subscription);
+});
+
+adminRouter.get("/audit-logs", async (c) => {
+  const limit = Number(c.req.query("limit")) || 100;
+  return c.json(await listAuditLogs({ limit, action: c.req.query("action") }));
 });
 
 const updateRoleSchema = z.object({
@@ -54,6 +60,6 @@ const resetPasswordSchema = z.object({
 
 adminRouter.post("/users/:id/reset-password", async (c) => {
   const { password } = resetPasswordSchema.parse(await c.req.json().catch(() => ({})));
-  const result = await adminResetUserPassword(c.req.param("id"), password);
+  const result = await adminResetUserPassword(c.req.param("id"), password, c.get("userId"));
   return c.json(result);
 });

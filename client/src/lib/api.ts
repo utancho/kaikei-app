@@ -3,6 +3,7 @@ import type {
   AdminBusiness,
   AdminStats,
   AdminUser,
+  AuditLog,
   BalanceSheet,
   BankImportBatch,
   BankTransactionRow,
@@ -279,6 +280,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify(password ? { password } : {}),
     }),
+  adminListAuditLogs: (limit = 100) => request<AuditLog[]>(`/admin/audit-logs${qs({ limit: String(limit) })}`),
 };
 
 export { ApiError };

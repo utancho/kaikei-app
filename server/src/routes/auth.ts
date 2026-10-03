@@ -23,16 +23,23 @@ function setSessionCookie(c: Context<AppEnv>, token: string) {
   });
 }
 
+function auditContext(c: { req: { header: (name: string) => string | undefined } }) {
+  return {
+    ipAddress: c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for") ?? null,
+    userAgent: c.req.header("user-agent") ?? null,
+  };
+}
+
 authRouter.post("/signup", async (c) => {
   const input = signupInputSchema.parse(await c.req.json());
-  const { user, token } = await signup(input.email, input.password, c.env.JWT_SECRET, input.name);
+  const { user, token } = await signup(input.email, input.password, c.env.JWT_SECRET, input.name, auditContext(c));
   setSessionCookie(c, token);
   return c.json({ user }, 201);
 });
 
 authRouter.post("/login", async (c) => {
   const input = loginInputSchema.parse(await c.req.json());
-  const { user, token } = await login(input.email, input.password, c.env.JWT_SECRET);
+  const { user, token } = await login(input.email, input.password, c.env.JWT_SECRET, auditContext(c));
   setSessionCookie(c, token);
   return c.json({ user });
 });

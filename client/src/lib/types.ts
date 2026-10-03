@@ -476,6 +476,17 @@ export interface AdminStats {
   mrrJpy: number | null;
 }
 
+export interface AuditLog {
+  id: string;
+  userId: string | null;
+  userEmail: string | null;
+  action: string;
+  detail: string | null;
+  ipAddress: string | null;
+  userAgent: string | null;
+  createdAt: string;
+}
+
 export interface AdminBusiness {
   id: string;
   name: string;

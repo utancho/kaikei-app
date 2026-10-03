@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2, KeyRound, Copy, X, Check } from "lucide-react";
+import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2, KeyRound, Copy, X, Check, ScrollText } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatYen } from "../lib/format";
-import type { AdminBusiness, AdminStats, AdminUser, SubscriptionStatus } from "../lib/types";
+import type { AdminBusiness, AdminStats, AdminUser, AuditLog, SubscriptionStatus } from "../lib/types";
 import { useAuth } from "../context/AuthContext";
 import { PageHeader } from "../components/ui/PageHeader";
 import { Card } from "../components/ui/Card";
@@ -34,6 +34,26 @@ const STATUS_TONES: Record<SubscriptionStatus, "gray" | "green" | "yellow" | "re
 
 const STATUS_OPTIONS: SubscriptionStatus[] = ["NONE", "TRIALING", "ACTIVE", "PAST_DUE", "CANCELED"];
 const STATUS_FILTERS: (SubscriptionStatus | "ALL")[] = ["ALL", "TRIALING", "ACTIVE", "PAST_DUE", "CANCELED", "NONE"];
+
+const AUDIT_LABELS: Record<string, { label: string; tone: "gray" | "green" | "yellow" | "red" | "blue" }> = {
+  LOGIN_SUCCESS: { label: "ログイン成功", tone: "green" },
+  LOGIN_FAILED: { label: "ログイン失敗", tone: "red" },
+  SIGNUP: { label: "新規登録", tone: "blue" },
+  PASSWORD_RESET: { label: "パスワード再設定", tone: "yellow" },
+  ROLE_CHANGE: { label: "権限変更", tone: "blue" },
+  SUBSCRIPTION_CHANGE: { label: "契約変更", tone: "gray" },
+};
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("ja-JP", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Tokyo",
+  }).format(new Date(value));
+}
 
 function StatCard({
   icon,
@@ -124,6 +144,7 @@ export default function Admin() {
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [businesses, setBusinesses] = useState<AdminBusiness[]>([]);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SubscriptionStatus | "ALL">("ALL");
@@ -132,11 +153,12 @@ export default function Admin() {
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.adminListUsers(), api.adminGetStats(), api.adminListBusinesses()])
-      .then(([u, s, b]) => {
+    Promise.all([api.adminListUsers(), api.adminGetStats(), api.adminListBusinesses(), api.adminListAuditLogs(100)])
+      .then(([u, s, b, logs]) => {
         setUsers(u);
         setStats(s);
         setBusinesses(b);
+        setAuditLogs(logs);
       })
       .catch((e) => toast.error(e instanceof ApiError ? e.message : "読み込みに失敗しました"))
       .finally(() => setLoading(false));
@@ -431,6 +453,49 @@ export default function Admin() {
                       <td className="px-4 py-2.5 text-gray-500">{formatDate(b.createdAt)}</td>
                     </tr>
                   ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+        <Card className="overflow-hidden">
+          <div className="px-4 py-2.5 bg-gray-50 font-semibold text-sm text-gray-700 flex items-center gap-1.5">
+            <ScrollText size={15} className="text-gray-400" />
+            操作ログ・ログイン履歴(直近100件)
+          </div>
+          {loading ? (
+            <div className="p-4">
+              <TableSkeleton rows={5} />
+            </div>
+          ) : auditLogs.length === 0 ? (
+            <EmptyState title="ログがまだありません" description="ログインや管理操作が記録されるとここに表示されます" />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 text-gray-500 text-xs">
+                  <tr>
+                    <th className="text-left font-medium px-4 py-2.5 whitespace-nowrap">日時</th>
+                    <th className="text-left font-medium px-4 py-2.5">操作</th>
+                    <th className="text-left font-medium px-4 py-2.5">対象ユーザー</th>
+                    <th className="text-left font-medium px-4 py-2.5">詳細</th>
+                    <th className="text-left font-medium px-4 py-2.5">IPアドレス</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {auditLogs.map((log) => {
+                    const meta = AUDIT_LABELS[log.action] ?? { label: log.action, tone: "gray" as const };
+                    return (
+                      <tr key={log.id}>
+                        <td className="px-4 py-2.5 text-gray-500 whitespace-nowrap">{formatDateTime(log.createdAt)}</td>
+                        <td className="px-4 py-2.5">
+                          <Badge tone={meta.tone}>{meta.label}</Badge>
+                        </td>
+                        <td className="px-4 py-2.5 text-gray-700">{log.userEmail ?? "-"}</td>
+                        <td className="px-4 py-2.5 text-gray-500">{log.detail ?? "-"}</td>
+                        <td className="px-4 py-2.5 text-gray-400 font-mono text-xs">{log.ipAddress ?? "-"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import { prisma } from "../lib/prisma.js";
 import { badRequest, notFound } from "../lib/httpError.js";
 import { hashPassword } from "../lib/auth.js";
+import { recordAudit } from "./auditService.js";
 
 const SUBSCRIPTION_STATUSES = new Set(["NONE", "TRIALING", "ACTIVE", "PAST_DUE", "CANCELED"]);
 
@@ -65,13 +66,21 @@ export async function getStats(stripe: Stripe | null, priceId: string | undefine
   };
 }
 
-export async function updateUserSubscription(userId: string, status: string) {
+export async function updateUserSubscription(userId: string, status: string, actingUserId?: string) {
   if (!SUBSCRIPTION_STATUSES.has(status)) badRequest("不正なステータスです");
 
   const existing = await prisma.subscription.findUnique({ where: { userId } });
   if (!existing) notFound("対象ユーザーのサブスクリプションが見つかりません");
 
-  return prisma.subscription.update({ where: { userId }, data: { status } });
+  const updated = await prisma.subscription.update({ where: { userId }, data: { status } });
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+  await recordAudit({
+    action: "SUBSCRIPTION_CHANGE",
+    userId: actingUserId ?? null,
+    userEmail: target?.email ?? null,
+    detail: `${existing.status} → ${status}`,
+  });
+  return updated;
 }
 
 const ROLES = new Set(["USER", "ADMIN"]);
@@ -85,7 +94,14 @@ export async function updateUserRole(actingUserId: string, targetUserId: string,
   const existing = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!existing) notFound("対象ユーザーが見つかりません");
 
-  return prisma.user.update({ where: { id: targetUserId }, data: { role } });
+  const updated = await prisma.user.update({ where: { id: targetUserId }, data: { role } });
+  await recordAudit({
+    action: "ROLE_CHANGE",
+    userId: actingUserId,
+    userEmail: existing!.email,
+    detail: `${existing!.role} → ${role}`,
+  });
+  return updated;
 }
 
 /** 紛らわしい文字(0/O/1/l/I)を除いた安全なランダムパスワードを生成する。 */
@@ -103,7 +119,7 @@ function generateTempPassword(length = 12): string {
  * password 未指定時は一時パスワードを生成して返す。ユーザーには別経路で安全に伝え、
  * 次回ログイン後に本人がパスワード変更することを推奨する。
  */
-export async function adminResetUserPassword(targetUserId: string, password?: string) {
+export async function adminResetUserPassword(targetUserId: string, password?: string, actingUserId?: string) {
   const user = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!user) notFound("対象ユーザーが見つかりません");
 
@@ -112,6 +128,13 @@ export async function adminResetUserPassword(targetUserId: string, password?: st
 
   const passwordHash = await hashPassword(newPassword);
   await prisma.user.update({ where: { id: targetUserId }, data: { passwordHash } });
+
+  await recordAudit({
+    action: "PASSWORD_RESET",
+    userId: actingUserId ?? null,
+    userEmail: user!.email,
+    detail: "管理者によるパスワード再設定",
+  });
 
   return { email: user!.email, password: newPassword, generated: !(password && password.length > 0) };
 }

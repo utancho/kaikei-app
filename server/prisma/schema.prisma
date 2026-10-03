@@ -27,6 +27,20 @@ model User {
   memberships  BusinessMember[]
 }
 
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  userEmail String?
+  action    String // LOGIN_SUCCESS | LOGIN_FAILED | SIGNUP | PASSWORD_RESET | ROLE_CHANGE | SUBSCRIPTION_CHANGE
+  detail    String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
 model Subscription {
   id                   String    @id @default(cuid())
   userId               String    @unique
