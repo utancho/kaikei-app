@@ -89,15 +89,15 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onOpenChange]);
 
-  // 開いたらリセット + マスタを一度だけ読み込む
+  // 開くたびに現在の事業者のマスタを読み込む(事業者を切り替えても古いデータが残らないように)
   useEffect(() => {
     if (!open) return;
     setQuery("");
     setSelected(0);
     setTimeout(() => inputRef.current?.focus(), 20);
     if (!currentBusiness) return;
-    if (partners.length === 0) api.listPartners(currentBusiness.id).then(setPartners).catch(() => {});
-    if (invoices.length === 0) api.listInvoices(currentBusiness.id).then(setInvoices).catch(() => {});
+    api.listPartners(currentBusiness.id).then(setPartners).catch(() => {});
+    api.listInvoices(currentBusiness.id).then(setInvoices).catch(() => {});
   }, [open, currentBusiness]);
 
   // 仕訳はキーワードでAPI検索(デバウンス)

@@ -59,16 +59,17 @@ export default function JournalEntries() {
   const [importResult, setImportResult] = useState<JournalImportResult | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const load = () => {
+  // overrides を渡すと、その値でサーバ検索する(クリア時に古い state を参照しないため)。
+  const load = (overrides?: { keyword?: string; from?: string; to?: string; accountId?: string }) => {
     if (!currentBusiness) return;
     setLoading(true);
     setSelected(new Set());
     api
       .listJournalEntries(currentBusiness.id, {
-        keyword: keyword || undefined,
-        from: from || undefined,
-        to: to || undefined,
-        accountId: accountId || undefined,
+        keyword: (overrides?.keyword ?? keyword) || undefined,
+        from: (overrides?.from ?? from) || undefined,
+        to: (overrides?.to ?? to) || undefined,
+        accountId: (overrides?.accountId ?? accountId) || undefined,
       })
       .then(setEntries)
       .finally(() => setLoading(false));
@@ -99,7 +100,7 @@ export default function JournalEntries() {
     setAccountId("");
     setSource("");
     setMinAmount("");
-    setTimeout(load, 0);
+    load({ keyword: "", from: "", to: "", accountId: "" });
   };
 
   const handleExport = () => {
@@ -296,7 +297,7 @@ export default function JournalEntries() {
           value={minAmount}
           onChange={(e) => setMinAmount(e.target.value)}
         />
-        <Button variant="secondary" onClick={load}>
+        <Button variant="secondary" onClick={() => load()}>
           検索
         </Button>
         <button className="text-sm text-gray-400 hover:text-gray-600 pb-2" onClick={resetFilters}>
