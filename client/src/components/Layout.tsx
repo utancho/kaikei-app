@@ -28,6 +28,8 @@ import {
   LogOut,
   ShieldCheck,
   Search,
+  Menu,
+  X,
 } from "lucide-react";
 import { useState } from "react";
 import { useBusiness } from "../context/BusinessContext";
@@ -92,20 +94,36 @@ export function Layout() {
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const isIndividual = currentBusiness?.type === "INDIVIDUAL";
 
   return (
     <div className="flex h-full min-h-screen">
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
-      <aside className="w-56 shrink-0 bg-brand-900 text-brand-50 flex flex-col no-print">
-        <div className="px-4 py-5 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center shrink-0">
-            <Wallet size={18} className="text-white" />
+
+      {/* モバイル用: サイドバーを開いているときの背景オーバーレイ */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
+      <aside
+        className={`w-56 shrink-0 bg-brand-900 text-brand-50 flex flex-col no-print fixed inset-y-0 left-0 z-40 transform transition-transform duration-200 md:static md:translate-x-0 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="px-4 py-5 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center shrink-0">
+              <Wallet size={18} className="text-white" />
+            </div>
+            <div>
+              <div className="text-base font-bold tracking-wide leading-none">Kaikei</div>
+              <div className="text-[11px] text-brand-300 mt-0.5">会計ソフト</div>
+            </div>
           </div>
-          <div>
-            <div className="text-base font-bold tracking-wide leading-none">Kaikei</div>
-            <div className="text-[11px] text-brand-300 mt-0.5">会計ソフト</div>
-          </div>
+          <button className="md:hidden text-brand-200 hover:text-white" onClick={() => setSidebarOpen(false)} aria-label="メニューを閉じる">
+            <X size={20} />
+          </button>
         </div>
         <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
           {NAV_GROUPS.map((group, gi) => {
@@ -125,6 +143,7 @@ export function Layout() {
                     key={item.to}
                     to={item.to}
                     end={item.end}
+                    onClick={() => setSidebarOpen(false)}
                     className={({ isActive }) =>
                       `flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors ${
                         isActive ? "bg-brand-600 text-white font-medium shadow-sm" : "text-brand-100/80 hover:bg-brand-800 hover:text-white"
@@ -141,12 +160,19 @@ export function Layout() {
         </nav>
       </aside>
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 shrink-0 no-print">
-          <div className="text-sm text-gray-600 flex items-center gap-2">
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 sm:px-6 shrink-0 no-print">
+          <div className="text-sm text-gray-600 flex items-center gap-2 min-w-0">
+            <button
+              className="md:hidden text-gray-500 hover:text-gray-800 shrink-0"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="メニューを開く"
+            >
+              <Menu size={22} />
+            </button>
             {currentBusiness ? (
               <>
-                <span className="font-medium">{currentBusiness.name}</span>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-100">
+                <span className="font-medium truncate max-w-[45vw] sm:max-w-none">{currentBusiness.name}</span>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 border border-brand-100 shrink-0">
                   {currentBusiness.type === "INDIVIDUAL" ? "個人事業主" : "法人"}
                 </span>
               </>
@@ -233,7 +259,7 @@ export function Layout() {
           </div>
           </div>
         </header>
-        <main className="flex-1 overflow-y-auto p-6 bg-gray-50">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
           <Outlet />
         </main>
       </div>
