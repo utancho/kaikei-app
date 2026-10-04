@@ -1,8 +1,8 @@
 import { LegalLayout } from "./LegalLayout";
 
 const ROWS: [string, string][] = [
-  ["販売事業者", "鈴木 ※要フルネーム(下記参照)"],
-  ["運営統括責任者", "鈴木 ※要フルネーム(下記参照)"],
+  ["販売事業者", "鈴木至恩"],
+  ["運営統括責任者", "鈴木至恩"],
   ["所在地", "ご請求をいただいた場合には、遅滞なく開示いたします。"],
   ["電話番号", "ご請求をいただいた場合には、遅滞なく開示いたします。"],
   ["メールアドレス", "suzukishion522@icloud.com"],
@@ -19,14 +19,8 @@ const ROWS: [string, string][] = [
 
 export default function CommercialTransactions() {
   return (
-    <LegalLayout title="特定商取引法に基づく表示" updatedAt="2026年8月17日">
-      <p>
-        特定商取引法に基づき、以下のとおり表示いたします。
-        <br />
-        <span className="text-amber-600 font-medium">
-          ※このページは運営者情報の入力が一部未完了です。事業者名(フルネーム)・所在地・電話番号を確定のうえ公開してください。
-        </span>
-      </p>
+    <LegalLayout title="特定商取引法に基づく表示" updatedAt="2026年10月4日">
+      <p>特定商取引法に基づき、以下のとおり表示いたします。</p>
       <table className="w-full border-collapse">
         <tbody>
           {ROWS.map(([label, value]) => (

@@ -2,7 +2,7 @@ import { LegalLayout } from "./LegalLayout";
 
 export default function TermsOfService() {
   return (
-    <LegalLayout title="利用規約" updatedAt="2026年8月17日">
+    <LegalLayout title="利用規約" updatedAt="2026年10月4日">
       <p>
         この利用規約(以下「本規約」といいます)は、Kaikei(以下「本サービス」といいます)の利用条件を定めるものです。ご利用になるすべてのお客様(以下「ユーザー」といいます)には、本規約に従って本サービスをご利用いただきます。
       </p>

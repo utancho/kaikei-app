@@ -2,7 +2,7 @@ import { LegalLayout } from "./LegalLayout";
 
 export default function PrivacyPolicy() {
   return (
-    <LegalLayout title="プライバシーポリシー" updatedAt="2026年8月17日">
+    <LegalLayout title="プライバシーポリシー" updatedAt="2026年10月4日">
       <p>
         Kaikei(以下「本サービス」といいます)は、お客様の個人情報の重要性を認識し、以下のとおりプライバシーポリシー(以下「本ポリシー」といいます)を定め、個人情報の保護に努めます。
       </p>
