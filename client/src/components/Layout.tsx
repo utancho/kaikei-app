@@ -24,6 +24,7 @@ import {
   BarChart3,
   LineChart,
   ClipboardCheck,
+  Landmark,
   LogOut,
   ShieldCheck,
   Search,
@@ -39,6 +40,7 @@ interface NavItem {
   icon: typeof LayoutDashboard;
   end?: boolean;
   individualOnly?: boolean;
+  corporateOnly?: boolean;
 }
 
 const NAV_GROUPS: { heading?: string; items: NavItem[] }[] = [
@@ -69,6 +71,7 @@ const NAV_GROUPS: { heading?: string; items: NavItem[] }[] = [
       { to: "/reports/partner-balances", label: "取引先別残高", icon: Contact },
       { to: "/reports/blue-return", label: "青色申告決算書", icon: FileBadge, individualOnly: true },
       { to: "/reports/consumption-tax", label: "消費税申告書", icon: Percent },
+      { to: "/reports/corporate-tax", label: "法人税申告書", icon: Landmark, corporateOnly: true },
       { to: "/budget", label: "予算実績管理", icon: Target },
       { to: "/reports/cash-flow-forecast", label: "資金繰り表", icon: Waves },
       { to: "/reports/year-end-closing", label: "決算処理", icon: ClipboardCheck },
@@ -106,7 +109,9 @@ export function Layout() {
         </div>
         <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-3">
           {NAV_GROUPS.map((group, gi) => {
-            const items = group.items.filter((item) => !item.individualOnly || isIndividual);
+            const items = group.items.filter(
+              (item) => (!item.individualOnly || isIndividual) && (!item.corporateOnly || !isIndividual)
+            );
             if (items.length === 0) return null;
             return (
               <div key={gi} className="space-y-0.5">

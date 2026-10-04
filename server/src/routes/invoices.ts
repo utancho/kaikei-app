@@ -9,6 +9,7 @@ import {
   listInvoices,
   postInvoiceToJournal,
   recordInvoicePayment,
+  sendInvoiceEmail,
   updateInvoice,
 } from "../services/invoiceService.js";
 import type { AppEnv } from "../types/env.js";
@@ -41,6 +42,11 @@ invoicesRouter.delete("/:id", async (c) => {
   const businessId = requireBusinessId(c);
   await deleteInvoice(businessId, c.req.param("id"));
   return c.body(null, 204);
+});
+
+invoicesRouter.post("/:id/send-email", async (c) => {
+  const businessId = requireBusinessId(c);
+  return c.json(await sendInvoiceEmail(c.env, businessId, c.req.param("id")));
 });
 
 invoicesRouter.post("/:id/post-journal", async (c) => {

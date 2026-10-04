@@ -4,6 +4,7 @@ import { hashPassword, signToken, verifyPassword } from "../lib/auth.js";
 import { verifyTOTP } from "../lib/totp.js";
 import { activatePendingInvites } from "./memberService.js";
 import { recordAudit, type AuditContext } from "./auditService.js";
+import { consumeBackupCode, countRemainingBackupCodes } from "./twoFactorService.js";
 
 function sanitizeUser(user: {
   id: string;
@@ -74,7 +75,9 @@ export async function login(
     if (!code) {
       return { twoFactorRequired: true as const };
     }
-    const codeOk = user!.twoFactorSecret ? await verifyTOTP(user!.twoFactorSecret, code) : false;
+    const totpOk = user!.twoFactorSecret ? await verifyTOTP(user!.twoFactorSecret, code) : false;
+    // 認証アプリのコードが一致しない場合はバックアップコードを試す(1回限り消費)。
+    const codeOk = totpOk || (await consumeBackupCode(user!.id, code));
     if (!codeOk) {
       await recordAudit({ action: "LOGIN_FAILED", userId: user!.id, userEmail: email, detail: "2FAコード不一致", context });
       badRequest("認証コードが正しくありません");
@@ -91,5 +94,9 @@ export async function getMe(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) return null;
   const subscription = await prisma.subscription.findUnique({ where: { userId } });
-  return { user: sanitizeUser(user), subscription };
+  const backupRemaining = user.twoFactorEnabled ? await countRemainingBackupCodes(userId) : 0;
+  return {
+    user: { ...sanitizeUser(user), twoFactorBackupCodesRemaining: backupRemaining },
+    subscription,
+  };
 }

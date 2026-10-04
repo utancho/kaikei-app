@@ -8,6 +8,7 @@ interface AuthUser {
   name: string | null;
   role: string;
   twoFactorEnabled?: boolean;
+  twoFactorBackupCodesRemaining?: number;
 }
 
 interface SubscriptionInfo {

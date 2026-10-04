@@ -10,6 +10,7 @@ import type {
   BlueReturnStatement,
   Business,
   BusinessAnalysis,
+  CorporateTaxReturn,
   BusinessMemberInfo,
   BusinessMembersResponse,
   BudgetActualResponse,
@@ -95,7 +96,9 @@ export const api = {
   logout: () => request<void>("/auth/logout", { method: "POST" }),
   twoFactorSetup: () => request<{ secret: string; otpauthUrl: string }>("/auth/2fa/setup", { method: "POST" }),
   twoFactorEnable: (code: string) =>
-    request<{ enabled: boolean }>("/auth/2fa/enable", { method: "POST", body: JSON.stringify({ code }) }),
+    request<{ enabled: boolean; backupCodes: string[] }>("/auth/2fa/enable", { method: "POST", body: JSON.stringify({ code }) }),
+  twoFactorRegenerateBackupCodes: () =>
+    request<{ backupCodes: string[] }>("/auth/2fa/backup-codes", { method: "POST" }),
   twoFactorDisable: (password: string) =>
     request<{ enabled: boolean }>("/auth/2fa/disable", { method: "POST", body: JSON.stringify({ password }) }),
   forgotPassword: (email: string) =>
@@ -110,7 +113,14 @@ export const api = {
     }),
   me: () =>
     request<{
-      user: { id: string; email: string; name: string | null; role: string; twoFactorEnabled?: boolean };
+      user: {
+        id: string;
+        email: string;
+        name: string | null;
+        role: string;
+        twoFactorEnabled?: boolean;
+        twoFactorBackupCodesRemaining?: number;
+      };
       subscription: { status: string; currentPeriodEnd: string | null } | null;
     }>("/auth/me"),
 
@@ -216,6 +226,8 @@ export const api = {
     request<Invoice>(`/invoices/${id}?businessId=${businessId}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteInvoice: (businessId: string, id: string) =>
     request<void>(`/invoices/${id}?businessId=${businessId}`, { method: "DELETE" }),
+  sendInvoiceEmail: (businessId: string, id: string) =>
+    request<{ sent: boolean; to: string }>(`/invoices/${id}/send-email?businessId=${businessId}`, { method: "POST" }),
   postInvoiceToJournal: (businessId: string, id: string) =>
     request<JournalEntry>(`/invoices/${id}/post-journal?businessId=${businessId}`, { method: "POST" }),
   recordInvoicePayment: (businessId: string, id: string, paymentAccountId: string, paymentDate: string) =>
@@ -277,6 +289,8 @@ export const api = {
   // Consumption tax return (消費税申告書)
   getConsumptionTax: (businessId: string, from?: string, to?: string) =>
     request<ConsumptionTaxReturn>(`/reports/consumption-tax${qs({ businessId, from, to })}`),
+  getCorporateTax: (businessId: string, from?: string, to?: string) =>
+    request<CorporateTaxReturn>(`/reports/corporate-tax${qs({ businessId, from, to })}`),
   getSimplifiedTaxCategories: () => request<SimplifiedTaxCategory[]>("/reports/consumption-tax/categories"),
 
   // Budget vs actual / cash flow forecast

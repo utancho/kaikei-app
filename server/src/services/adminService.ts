@@ -147,6 +147,7 @@ export async function adminDisableTwoFactor(targetUserId: string, actingUserId?:
   if (!user!.twoFactorEnabled) badRequest("このユーザーは二要素認証が有効ではありません");
 
   await prisma.user.update({ where: { id: targetUserId }, data: { twoFactorEnabled: false, twoFactorSecret: null } });
+  await prisma.twoFactorBackupCode.deleteMany({ where: { userId: targetUserId } });
   await recordAudit({
     action: "TWO_FACTOR_DISABLED",
     userId: actingUserId ?? null,

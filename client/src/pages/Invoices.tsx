@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Plus, FileText, Pencil, Trash2, Send, Wallet } from "lucide-react";
+import { Plus, FileText, Pencil, Trash2, Send, Wallet, Mail } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatYen, toInputDate } from "../lib/format";
@@ -67,6 +67,25 @@ export default function Invoices() {
       load();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "計上に失敗しました");
+    }
+  };
+
+  const handleSendEmail = async (inv: Invoice) => {
+    if (!inv.partner?.email) {
+      toast.error("取引先にメールアドレスが登録されていません");
+      return;
+    }
+    const ok = await confirm({
+      title: "請求書をメール送信しますか?",
+      description: `${inv.partner.name}(${inv.partner.email})宛に請求書「${inv.invoiceNumber}」を送信します。`,
+      confirmLabel: "送信する",
+    });
+    if (!ok) return;
+    try {
+      const res = await api.sendInvoiceEmail(currentBusiness.id, inv.id);
+      toast.success(`${res.to} に送信しました`);
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "送信に失敗しました");
     }
   };
 
@@ -167,6 +186,9 @@ export default function Invoices() {
                             <Wallet size={15} />
                           </button>
                         )}
+                        <button className="text-gray-400 hover:text-brand-600" title="メールで送信" onClick={() => handleSendEmail(inv)}>
+                          <Mail size={15} />
+                        </button>
                         <Link className="text-gray-400 hover:text-brand-600" to={`/invoices/${inv.id}`}>
                           <Pencil size={15} />
                         </Link>

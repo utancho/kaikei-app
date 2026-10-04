@@ -1,6 +1,6 @@
 import { useState } from "react";
 import QRCode from "qrcode";
-import { ShieldCheck, ShieldAlert, Smartphone } from "lucide-react";
+import { ShieldCheck, ShieldAlert, Smartphone, Copy, RefreshCw, KeyRound } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { api, ApiError } from "../lib/api";
 import { Card, CardHeader } from "./ui/Card";
@@ -20,8 +20,34 @@ export function TwoFactorSettings() {
   const [secret, setSecret] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [backupCodes, setBackupCodes] = useState<string[] | null>(null);
 
   const enabled = Boolean(user?.twoFactorEnabled);
+  const remaining = user?.twoFactorBackupCodesRemaining ?? 0;
+
+  const copyBackupCodes = async () => {
+    if (!backupCodes) return;
+    try {
+      await navigator.clipboard.writeText(backupCodes.join("\n"));
+      toast.success("バックアップコードをコピーしました");
+    } catch {
+      toast.error("コピーできませんでした");
+    }
+  };
+
+  const regenerate = async () => {
+    setLoading(true);
+    try {
+      const res = await api.twoFactorRegenerateBackupCodes();
+      setBackupCodes(res.backupCodes);
+      toast.success("バックアップコードを再生成しました");
+      await refresh();
+    } catch (e) {
+      toast.error(e instanceof ApiError ? e.message : "再生成に失敗しました");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const startEnroll = async () => {
     setLoading(true);
@@ -41,7 +67,8 @@ export function TwoFactorSettings() {
   const confirmEnable = async () => {
     setLoading(true);
     try {
-      await api.twoFactorEnable(code);
+      const res = await api.twoFactorEnable(code);
+      setBackupCodes(res.backupCodes);
       toast.success("二要素認証を有効にしました");
       setMode("idle");
       await refresh();
@@ -79,6 +106,32 @@ export function TwoFactorSettings() {
         subtitle="ログイン時に認証アプリのワンタイムコードを要求し、アカウントを保護します"
       />
 
+      {backupCodes && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-800 mb-2">
+            <KeyRound size={16} /> バックアップコード(今だけ表示)
+          </div>
+          <p className="text-xs text-amber-800 mb-3">
+            認証アプリが使えないときにログインで使用できます。各コードは1回のみ有効です。安全な場所に保管してください。
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+            {backupCodes.map((c) => (
+              <code key={c} className="bg-white border border-amber-200 rounded px-2 py-1.5 text-center text-sm font-mono text-gray-800">
+                {c}
+              </code>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Button size="sm" variant="secondary" icon={<Copy size={14} />} onClick={copyBackupCodes}>
+              コピー
+            </Button>
+            <Button size="sm" variant="secondary" onClick={() => setBackupCodes(null)}>
+              閉じる
+            </Button>
+          </div>
+        </div>
+      )}
+
       {enabled ? (
         mode === "disabling" ? (
           <div className="space-y-3 max-w-sm">
@@ -103,7 +156,13 @@ export function TwoFactorSettings() {
         ) : (
           <div className="flex items-center gap-3 text-sm text-gray-600">
             <ShieldCheck size={20} className="text-emerald-500" />
-            <span className="flex-1">認証アプリによる二要素認証が有効です。</span>
+            <span className="flex-1">
+              認証アプリによる二要素認証が有効です。
+              <span className="text-gray-400">(残りバックアップコード: {remaining}個)</span>
+            </span>
+            <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} loading={loading} onClick={regenerate}>
+              コード再生成
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setMode("disabling")}>
               無効化
             </Button>

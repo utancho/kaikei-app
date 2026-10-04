@@ -309,6 +309,27 @@ export interface ConsumptionTaxReturn {
   payableTax?: { national: number; local: number; total: number };
 }
 
+export interface CorporateTaxReturn {
+  business: { name: string; type: BusinessType };
+  period: { from: string; to: string };
+  pretaxIncome: number;
+  taxableIncome: number;
+  corporateTax: {
+    reducedBase: number;
+    reducedRate: number;
+    reducedAmount: number;
+    standardBase: number;
+    standardRate: number;
+    standardAmount: number;
+    total: number;
+  };
+  localCorporateTax: { rate: number; amount: number };
+  inhabitantTax: { corporateTaxLevyRate: number; corporateTaxLevy: number; perCapita: number; total: number };
+  enterpriseTax: { rate: number; amount: number };
+  totalTax: number;
+  effectiveRate: number | null;
+}
+
 export interface SimplifiedTaxCategory {
   id: number;
   label: string;

@@ -18,6 +18,7 @@ import { getBlueReturnStatement } from "../services/blueReturnService.js";
 import { getConsumptionTaxReturn, getSimplifiedTaxCategories } from "../services/consumptionTaxService.js";
 import { getCashFlowForecast } from "../services/budgetService.js";
 import { getYearEndClosing } from "../services/closingService.js";
+import { getCorporateTaxReturn } from "../services/corporateTaxService.js";
 import type { AppEnv } from "../types/env.js";
 
 export const reportsRouter = new Hono<AppEnv>();
@@ -82,6 +83,12 @@ reportsRouter.get("/blue-return", async (c) => {
   const businessId = requireBusinessId(c);
   const { from, to } = await resolvePeriod(businessId, c);
   return c.json(await getBlueReturnStatement(businessId, from, to));
+});
+
+reportsRouter.get("/corporate-tax", async (c) => {
+  const businessId = requireBusinessId(c);
+  const { from, to } = await resolvePeriod(businessId, c);
+  return c.json(await getCorporateTaxReturn(businessId, from, to));
 });
 
 reportsRouter.get("/consumption-tax", async (c) => {

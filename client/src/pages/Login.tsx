@@ -66,16 +66,15 @@ export default function Login() {
                 <label className={labelClass}>認証コード(6桁)</label>
                 <input
                   type="text"
-                  inputMode="numeric"
                   autoFocus
-                  maxLength={6}
-                  placeholder="000000"
+                  maxLength={20}
+                  placeholder="123456 または xxxx-xxxx"
                   required
-                  className={`${inputClass} w-full tracking-[0.4em] text-center text-lg`}
+                  className={`${inputClass} w-full text-center text-lg`}
                   value={code}
-                  onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                  onChange={(e) => setCode(e.target.value.trim())}
                 />
-                <p className="text-xs text-gray-500 mt-1.5">認証アプリに表示されている6桁のコードを入力してください。</p>
+                <p className="text-xs text-gray-500 mt-1.5">認証アプリの6桁コード、またはバックアップコードを入力してください。</p>
               </div>
             )}
             <Button type="submit" className="w-full justify-center" loading={loading}>

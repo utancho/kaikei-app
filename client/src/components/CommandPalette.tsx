@@ -27,6 +27,7 @@ import {
   Settings as SettingsIcon,
   Repeat,
   ClipboardCheck,
+  Landmark,
 } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { api } from "../lib/api";
@@ -43,7 +44,7 @@ interface Command {
   run: () => void;
 }
 
-const PAGES: { to: string; label: string; icon: ReactNode; keywords: string; individualOnly?: boolean }[] = [
+const PAGES: { to: string; label: string; icon: ReactNode; keywords: string; individualOnly?: boolean; corporateOnly?: boolean }[] = [
   { to: "/", label: "ダッシュボード", icon: <LayoutDashboard size={16} />, keywords: "dashboard home ホーム" },
   { to: "/journal-entries", label: "仕訳帳", icon: <BookText size={16} />, keywords: "journal しわけ 仕訳" },
   { to: "/journal-entry-templates", label: "仕訳テンプレート", icon: <Repeat size={16} />, keywords: "template てんぷれ" },
@@ -61,6 +62,7 @@ const PAGES: { to: string; label: string; icon: ReactNode; keywords: string; ind
   { to: "/reports/partner-balances", label: "取引先別残高", icon: <Contact size={16} />, keywords: "partner balance 残高" },
   { to: "/reports/blue-return", label: "青色申告決算書", icon: <FileBadge size={16} />, keywords: "blue return あおいろ 申告", individualOnly: true },
   { to: "/reports/consumption-tax", label: "消費税申告書", icon: <Percent size={16} />, keywords: "consumption tax しょうひぜい" },
+  { to: "/reports/corporate-tax", label: "法人税申告書", icon: <Landmark size={16} />, keywords: "corporate tax ほうじんぜい", corporateOnly: true },
   { to: "/budget", label: "予算実績管理", icon: <Target size={16} />, keywords: "budget よさん" },
   { to: "/reports/cash-flow-forecast", label: "資金繰り表", icon: <Waves size={16} />, keywords: "cash flow しきんぐり" },
   { to: "/reports/year-end-closing", label: "決算処理", icon: <ClipboardCheck size={16} />, keywords: "closing けっさん 期末 決算" },
@@ -147,7 +149,9 @@ export function CommandPalette({ open, onOpenChange }: { open: boolean; onOpenCh
       },
     ];
 
-    const pageCmds: Command[] = PAGES.filter((p) => !p.individualOnly || isIndividual).map((p) => ({
+    const pageCmds: Command[] = PAGES.filter(
+      (p) => (!p.individualOnly || isIndividual) && (!p.corporateOnly || !isIndividual)
+    ).map((p) => ({
       id: `page-${p.to}`,
       label: p.label,
       section: "ページ",

@@ -29,6 +29,16 @@ model User {
   memberships  BusinessMember[]
 }
 
+model TwoFactorBackupCode {
+  id        String    @id @default(cuid())
+  userId    String
+  codeHash  String
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+}
+
 model PasswordResetToken {
   id        String   @id @default(cuid())
   userId    String

@@ -11,7 +11,7 @@ import {
 } from "../lib/zodSchemas.js";
 import { getMe, login, signup } from "../services/authService.js";
 import { requestPasswordReset, resetPasswordWithToken } from "../services/passwordResetService.js";
-import { disableTwoFactor, enableTwoFactor, setupTwoFactor } from "../services/twoFactorService.js";
+import { disableTwoFactor, enableTwoFactor, regenerateBackupCodes, setupTwoFactor } from "../services/twoFactorService.js";
 import { requireAuth } from "../middleware/auth.js";
 import type { AppEnv } from "../types/env.js";
 import type { Context } from "hono";
@@ -76,6 +76,10 @@ authRouter.post("/2fa/setup", requireAuth, async (c) => {
 authRouter.post("/2fa/enable", requireAuth, async (c) => {
   const { code } = twoFactorEnableSchema.parse(await c.req.json());
   return c.json(await enableTwoFactor(c.get("userId"), code, auditContext(c)));
+});
+
+authRouter.post("/2fa/backup-codes", requireAuth, async (c) => {
+  return c.json(await regenerateBackupCodes(c.get("userId")));
 });
 
 authRouter.post("/2fa/disable", requireAuth, async (c) => {

@@ -3,6 +3,8 @@ import { notFound, badRequest } from "../lib/httpError.js";
 import type { z } from "zod";
 import type { invoiceInputSchema } from "../lib/zodSchemas.js";
 import { getOrCreateFiscalYearForDate } from "./fiscalYearService.js";
+import { isEmailEnabled, renderEmail, sendEmail } from "./emailService.js";
+import type { Bindings } from "../types/env.js";
 
 export type InvoiceInput = z.infer<typeof invoiceInputSchema>;
 
@@ -108,6 +110,59 @@ export async function updateInvoice(businessId: string, id: string, input: Invoi
       include: { items: true, partner: true },
     });
   });
+}
+
+const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
+const ymd = (d: Date) =>
+  new Intl.DateTimeFormat("ja-JP", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "UTC" }).format(d);
+
+/** 請求書を取引先のメールアドレス宛に送信する。 */
+export async function sendInvoiceEmail(env: Bindings, businessId: string, id: string) {
+  if (!isEmailEnabled(env)) {
+    badRequest("メール送信が未設定です。RESEND_API_KEY と MAIL_FROM を設定してください");
+  }
+  const invoice = await prisma.invoice.findFirst({
+    where: { id, businessId },
+    include: { partner: true, items: true },
+  });
+  if (!invoice) notFound("請求書が見つかりません");
+  if (!invoice!.partner.email) badRequest("取引先にメールアドレスが登録されていません");
+
+  const business = await prisma.business.findUniqueOrThrow({ where: { id: businessId } });
+
+  const rows = invoice!.items
+    .map(
+      (it) =>
+        `<tr><td style="padding:4px 8px;border-bottom:1px solid #eee;">${it.description}</td>` +
+        `<td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;">${it.quantity}</td>` +
+        `<td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;">${yen(it.unitPrice)}</td>` +
+        `<td style="padding:4px 8px;border-bottom:1px solid #eee;text-align:right;">${yen(it.amount)}</td></tr>`
+    )
+    .join("");
+
+  const bodyHtml =
+    `<p>${invoice!.partner.name} 御中</p>` +
+    `<p>いつもお世話になっております。${business.name} です。<br>下記のとおりご請求申し上げます。</p>` +
+    `<p>請求書番号: <strong>${invoice!.invoiceNumber}</strong><br>` +
+    `発行日: ${ymd(invoice!.issueDate)}` +
+    (invoice!.dueDate ? `<br>お支払期限: ${ymd(invoice!.dueDate)}` : "") +
+    `</p>` +
+    `<table style="border-collapse:collapse;width:100%;font-size:13px;margin:12px 0;">` +
+    `<thead><tr style="background:#f3f4f6;"><th style="padding:4px 8px;text-align:left;">品目</th>` +
+    `<th style="padding:4px 8px;text-align:right;">数量</th><th style="padding:4px 8px;text-align:right;">単価</th>` +
+    `<th style="padding:4px 8px;text-align:right;">金額</th></tr></thead><tbody>${rows}</tbody></table>` +
+    `<p style="text-align:right;">小計: ${yen(invoice!.subtotal)}<br>消費税: ${yen(invoice!.taxAmount)}<br>` +
+    `<strong style="font-size:16px;">合計: ${yen(invoice!.total)}</strong></p>` +
+    (invoice!.notes ? `<p style="color:#6b7280;">${invoice!.notes}</p>` : "");
+
+  const result = await sendEmail(env, {
+    to: invoice!.partner.email!,
+    subject: `【${business.name}】請求書 ${invoice!.invoiceNumber} のご送付`,
+    html: renderEmail({ heading: `請求書 ${invoice!.invoiceNumber}`, bodyHtml }),
+  });
+  if (!result.sent) badRequest(result.reason ?? "メール送信に失敗しました");
+
+  return { sent: true, to: invoice!.partner.email };
 }
 
 export async function deleteInvoice(businessId: string, id: string) {

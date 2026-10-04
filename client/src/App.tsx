@@ -32,6 +32,7 @@ const JournalEntryTemplates = lazy(() => import("./pages/JournalEntryTemplates")
 const BlueReturn = lazy(() => import("./pages/BlueReturn"));
 const BlueReturnPrint = lazy(() => import("./pages/BlueReturnPrint"));
 const ConsumptionTax = lazy(() => import("./pages/ConsumptionTax"));
+const CorporateTax = lazy(() => import("./pages/CorporateTax"));
 const Budget = lazy(() => import("./pages/Budget"));
 const CashFlowForecast = lazy(() => import("./pages/CashFlowForecast"));
 const ReceiptScan = lazy(() => import("./pages/ReceiptScan"));
@@ -91,6 +92,7 @@ function WorkspaceRoutes() {
         <Route path="/journal-entry-templates" element={<JournalEntryTemplates />} />
         <Route path="/reports/blue-return" element={<BlueReturn />} />
         <Route path="/reports/consumption-tax" element={<ConsumptionTax />} />
+        <Route path="/reports/corporate-tax" element={<CorporateTax />} />
         <Route path="/budget" element={<Budget />} />
         <Route path="/reports/cash-flow-forecast" element={<CashFlowForecast />} />
         <Route path="/receipt-scan" element={<ReceiptScan />} />
