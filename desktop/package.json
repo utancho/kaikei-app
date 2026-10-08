@@ -2,7 +2,7 @@
   "name": "kaikei-desktop",
   "productName": "Kaikei",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "会計ソフト Kaikei のデスクトップ版(Webアプリのラッパー)",
   "author": "Kaikei",
   "main": "main.js",

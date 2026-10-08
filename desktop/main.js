@@ -1,7 +1,16 @@
 const { app, BrowserWindow, shell } = require("electron");
 const path = require("path");
 
-const APP_URL = "https://kaikei-app.suzu-e97.workers.dev";
+const APP_URL = "https://keirio-hub.com";
+const APP_ORIGIN = new URL(APP_URL).origin;
+
+function isAppUrl(url) {
+  try {
+    return new URL(url).origin === APP_ORIGIN;
+  } catch {
+    return false;
+  }
+}
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -14,6 +23,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
     },
   });
 
@@ -22,11 +33,23 @@ function createWindow() {
 
   // 外部リンク(Stripeなど)はOSのデフォルトブラウザで開く。
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (!url.startsWith(APP_URL)) {
-      shell.openExternal(url);
+    if (!isAppUrl(url)) {
+      if (url.startsWith("https://") || url.startsWith("http://")) {
+        shell.openExternal(url);
+      }
       return { action: "deny" };
     }
     return { action: "allow" };
+  });
+
+  // 同じウィンドウを外部サイトへ遷移させない。
+  win.webContents.on("will-navigate", (event, url) => {
+    if (!isAppUrl(url)) {
+      event.preventDefault();
+      if (url.startsWith("https://") || url.startsWith("http://")) {
+        shell.openExternal(url);
+      }
+    }
   });
 }
 

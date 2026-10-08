@@ -25,7 +25,14 @@ jobs:
 
       - name: Install dependencies
         working-directory: desktop
-        run: npm install
+        run: npm ci
+
+      - name: Verify release tag matches package version
+        if: startsWith(github.ref, 'refs/tags/desktop-v')
+        shell: bash
+        run: |
+          PACKAGE_VERSION="$(node -p "require('./desktop/package.json').version")"
+          test "${GITHUB_REF_NAME}" = "desktop-v${PACKAGE_VERSION}"
 
       - name: Build installer
         working-directory: desktop
