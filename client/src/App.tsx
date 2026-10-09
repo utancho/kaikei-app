@@ -12,8 +12,8 @@ const InviteAccept = lazy(() => import("./pages/InviteAccept"));
 import DesktopShell from "./components/DesktopShell";
 import RouteSeo from "./components/RouteSeo";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
-import Login from "./pages/Login";
-import Signup from "./pages/Signup";
+const Login = lazy(() => import("./pages/Login"));
+const Signup = lazy(() => import("./pages/Signup"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
 // それ以外のページはルート単位で遅延読み込みし、初回ロードを軽くする。
@@ -90,7 +90,7 @@ function WorkspaceRoutes() {
   const { isSubscriptionActive, logout } = useAuth();
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
+    return <PageLoader />;
   }
 
   if (error) return <div className="mx-auto max-w-lg p-8"><h1 className="text-xl font-semibold">データを読み込めませんでした</h1><p role="alert" className="mt-4 text-sm text-red-700">{error}</p><button onClick={()=>refresh()} className="mt-5 rounded border px-4 py-3">再読み込み</button></div>;
@@ -150,7 +150,7 @@ function AppRoutes() {
   if(classifyPagePath(location.pathname)==='unknown') return <NotFound />;
 
   if (loading) {
-    return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
+    return <PageLoader />;
   }
 
   if (location.pathname === "/blog" || location.pathname.startsWith("/blog/")) {

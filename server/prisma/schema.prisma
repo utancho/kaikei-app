@@ -280,6 +280,7 @@ model JournalEntry {
   lines JournalEntryLine[]
 
   @@index([businessId, entryDate])
+  @@index([businessId, status, entryDate])
   @@index([businessId, fiscalYearId])
 }
 
