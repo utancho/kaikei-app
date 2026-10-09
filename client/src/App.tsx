@@ -1,10 +1,17 @@
-import { Suspense, lazy } from "react";
+import { Suspense, lazy, useState } from "react";
+import { capturePendingVerification } from "./lib/pendingVerification";
+import {classifyPagePath} from '../../server/src/lib/seoRoutes';
+import NotFound from './pages/NotFound';
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BusinessProvider, useBusiness } from "./context/BusinessContext";
 import { Layout } from "./components/Layout";
-// 未ログイン時に最初に表示するページは即時表示したいので通常import。
-import Landing from "./pages/Landing";
+// Marketing and animation code are loaded only on public pages.
+const Landing = lazy(() => import("./pages/Landing"));
+const InviteAccept = lazy(() => import("./pages/InviteAccept"));
+import DesktopShell from "./components/DesktopShell";
+import RouteSeo from "./components/RouteSeo";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
@@ -26,6 +33,8 @@ const InvoiceForm = lazy(() => import("./pages/InvoiceForm"));
 const InvoicePrint = lazy(() => import("./pages/InvoicePrint"));
 const BankImport = lazy(() => import("./pages/BankImport"));
 const Settings = lazy(() => import("./pages/Settings"));
+const Operations = lazy(() => import("./pages/Operations"));
+const AccountSecurity = lazy(() => import("./pages/AccountSecurity"));
 const OnboardingWizard = lazy(() => import("./pages/OnboardingWizard"));
 const FixedAssets = lazy(() => import("./pages/FixedAssets"));
 const JournalEntryTemplates = lazy(() => import("./pages/JournalEntryTemplates"));
@@ -41,6 +50,11 @@ const MonthlyTrend = lazy(() => import("./pages/MonthlyTrend"));
 const ManagementAnalysis = lazy(() => import("./pages/ManagementAnalysis"));
 const YearEndClosing = lazy(() => import("./pages/YearEndClosing"));
 const Admin = lazy(() => import("./pages/Admin"));
+const AdminBlog = lazy(() => import("./pages/AdminBlog"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
+const EditorialPolicy = lazy(() => import("./pages/EditorialPolicy"));
+const BlogLayout = lazy(() => import("./components/BlogLayout"));
 const CommercialTransactions = lazy(() => import("./pages/legal/CommercialTransactions"));
 const PrivacyPolicy = lazy(() => import("./pages/legal/PrivacyPolicy"));
 const TermsOfService = lazy(() => import("./pages/legal/TermsOfService"));
@@ -59,15 +73,34 @@ function LegalRoutes() {
   );
 }
 
+function PublicBlogRoutes() {
+  return (
+    <Routes>
+      <Route element={<BlogLayout />}>
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/editorial-policy" element={<EditorialPolicy />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
+      </Route>
+    </Routes>
+  );
+}
+
 function WorkspaceRoutes() {
-  const { loading, currentBusiness } = useBusiness();
+  const { loading, error, refresh, currentBusiness, businesses, setCurrentBusinessId } = useBusiness();
+  const { isSubscriptionActive, logout } = useAuth();
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
   }
 
+  if (error) return <div className="mx-auto max-w-lg p-8"><h1 className="text-xl font-semibold">データを読み込めませんでした</h1><p role="alert" className="mt-4 text-sm text-red-700">{error}</p><button onClick={()=>refresh()} className="mt-5 rounded border px-4 py-3">再読み込み</button></div>;
   if (!currentBusiness) {
+    if (!isSubscriptionActive) return <Billing />;
     return <OnboardingWizard />;
+  }
+  if (!(currentBusiness.planActive ?? isSubscriptionActive)) {
+    if (currentBusiness.isOwner) return <Billing />;
+    return <div className="mx-auto max-w-lg p-8"><h1 className="text-xl font-semibold">共有元の契約をご確認ください</h1><p className="mt-4 text-sm leading-7 text-gray-600">この事業者のオーナーの契約が利用可能な状態になると、共有データを開けます。オーナーへご確認ください。</p><label className="mt-6 block text-sm">事業者を切り替える<select className="mt-2 block w-full rounded border p-3" value={currentBusiness.id} onChange={e=>setCurrentBusinessId(e.target.value)}>{businesses.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select></label><button className="mt-5 rounded border px-4 py-3 text-sm" onClick={()=>logout()}>ログアウト</button></div>;
   }
 
   return (
@@ -76,6 +109,7 @@ function WorkspaceRoutes() {
       <Route path="/reports/blue-return/print" element={<BlueReturnPrint />} />
       {LegalRoutes()}
       <Route element={<Layout />}>
+        <Route path="/app" element={<Dashboard />} />
         <Route path="/" element={<Dashboard />} />
         <Route path="/journal-entries" element={<JournalEntries />} />
         <Route path="/journal-entries/:id" element={<JournalEntryForm />} />
@@ -101,6 +135,7 @@ function WorkspaceRoutes() {
         <Route path="/reports/year-end-closing" element={<YearEndClosing />} />
         <Route path="/reports/partner-balances" element={<PartnerBalances />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/operations" element={<Operations />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Route>
     </Routes>
@@ -108,22 +143,35 @@ function WorkspaceRoutes() {
 }
 
 function AppRoutes() {
-  const { user, loading, isSubscriptionActive } = useAuth();
+  useState(capturePendingVerification);
+  const { user, loading } = useAuth();
   const location = useLocation();
+
+  if(classifyPagePath(location.pathname)==='unknown') return <NotFound />;
 
   if (loading) {
     return <div className="flex items-center justify-center h-screen text-gray-400">読み込み中...</div>;
   }
 
+  if (location.pathname === "/blog" || location.pathname.startsWith("/blog/")) {
+    return <PublicBlogRoutes />;
+  }
+  if (location.pathname === "/invite") return <InviteAccept />;
+
   if (!user) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/account" element={<Navigate to="/login?next=/account" replace />} />
+        <Route path="/account-security" element={<Navigate to="/login?next=/account" replace />} />
+        <Route path="/app" element={<Navigate to="/login" replace />} />
+        <Route path="/operations" element={<Navigate to="/login?next=/operations" replace />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         {LegalRoutes()}
-        <Route path="*" element={<Landing />} />
+        <Route path="/" element={window.keirioDesktop?.isDesktop ? <Navigate to="/login" replace /> : <Landing />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }
@@ -132,19 +180,13 @@ function AppRoutes() {
     return (
       <Routes>
         <Route path="/admin" element={<Admin />} />
+        <Route path="/admin/blog" element={<AdminBlog />} />
       </Routes>
     );
   }
 
-  if (!isSubscriptionActive) {
-    return (
-      <Routes>
-        <Route path="/billing/success" element={<BillingSuccess />} />
-        {LegalRoutes()}
-        <Route path="*" element={<Billing />} />
-      </Routes>
-    );
-  }
+  if (location.pathname === "/billing/success") return <BillingSuccess />;
+  if (location.pathname === "/account-security" || location.pathname === "/account") return <AccountSecurity />;
 
   return (
     <BusinessProvider>
@@ -157,7 +199,7 @@ export default function App() {
   return (
     <AuthProvider>
       <Suspense fallback={<PageLoader />}>
-        <AppRoutes />
+        <DesktopShell><AppErrorBoundary><RouteSeo /><AppRoutes /></AppErrorBoundary></DesktopShell>
       </Suspense>
     </AuthProvider>
   );

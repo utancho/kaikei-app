@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import { Camera, Plus, Sparkles, Trash2, Loader2, CheckCircle2, AlertCircle, BookPlus } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { api, ApiError } from "../lib/api";
@@ -175,6 +176,7 @@ export default function ReceiptScan() {
         title="レシートから仕訳作成"
         subtitle="スマホで複数のレシートを撮影・選択し、まとめて仕訳にできます"
       />
+      <p className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900">無料運用では外部AIの自動読取を停止しています。<Link className="font-medium underline" to="/operations">実務管理で原本を保存・過去仕訳の候補を確認</Link>できます。手入力は従来の仕訳入力をご利用ください。</p>
 
       {/* 追加エリア */}
       <Card className="p-4 sm:p-5">

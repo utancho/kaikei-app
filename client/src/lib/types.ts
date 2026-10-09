@@ -15,6 +15,8 @@ export interface Business {
   simplifiedTaxCategory: number;
   blueReturnDeduction: number;
   isOwner?: boolean;
+  accessRole?: "OWNER" | "MEMBER" | "VIEWER";
+  planActive?: boolean;
 }
 
 export interface BusinessMemberInfo {
@@ -24,6 +26,8 @@ export interface BusinessMemberInfo {
   role: string;
   invitedAt: string;
   joinedAt: string | null;
+  inviteToken?: string;
+  expiresAt?: string | null;
 }
 
 export interface BusinessMembersResponse {
@@ -551,4 +555,31 @@ export interface AdminBusiness {
   memberCount: number;
   journalEntryCount: number;
   createdAt: string;
+}
+
+export interface BlogPostSummary {
+  id: string;
+  slug: string;
+  title: string;
+  excerpt: string | null;
+  coverImageUrl: string | null;
+  category: string | null;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BlogPost extends BlogPostSummary {
+  content: string;
+  published: boolean;
+}
+
+export interface BlogPostInput {
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  content: string;
+  coverImageUrl: string | null;
+  category: string | null;
+  published: boolean;
 }

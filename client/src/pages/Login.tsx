@@ -1,8 +1,9 @@
+import { KeirioIcon } from "../components/KeirioIcon";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { ApiError } from "../lib/api";
+import { safeNextPath } from "../lib/pendingVerification";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { inputClass, labelClass } from "../lib/formStyles";
@@ -28,7 +29,7 @@ export default function Login() {
         setLoading(false);
         return;
       }
-      navigate("/");
+      navigate(safeNextPath());
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "ログインに失敗しました");
     } finally {
@@ -40,10 +41,8 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <Link to="/" className="flex items-center gap-2 justify-center mb-6">
-          <div className="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center">
-            <Wallet size={20} className="text-white" />
-          </div>
-          <div className="text-xl font-bold text-gray-900">Kaikei</div>
+          <KeirioIcon size={36} />
+          <div className="text-xl font-bold text-gray-900">keirio</div>
         </Link>
 
         <Card className="p-8">
@@ -88,7 +87,7 @@ export default function Login() {
           </p>
           <p className="text-sm text-gray-500 text-center mt-6">
             アカウントをお持ちでない方は{" "}
-            <Link to="/signup" className="text-brand-600 hover:underline font-medium">
+            <Link to={`/signup?next=${encodeURIComponent(safeNextPath())}`} className="text-brand-600 hover:underline font-medium">
               新規登録
             </Link>
           </p>

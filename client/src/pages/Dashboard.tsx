@@ -23,6 +23,8 @@ import { Card, CardHeader } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
 import { EmptyState } from "../components/ui/EmptyState";
 import { Skeleton } from "../components/ui/Skeleton";
+import MonthlyTasks from "../components/MonthlyTasks";
+import WorkQueue from "../components/WorkQueue";
 
 const PIE_COLORS = ["#2f8a70", "#4fa389", "#7ebfa9", "#aed7c8", "#d6ebe3", "#9ca3af"];
 
@@ -61,10 +63,14 @@ export default function Dashboard() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [monthlyTrend, setMonthlyTrend] = useState<MonthlyTrendPoint[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError,setLoadError]=useState("");
+  const [retry,setRetry]=useState(0);
 
   useEffect(() => {
     if (!currentBusiness) return;
+    let active=true;
     setLoading(true);
+    setLoadError("");
     Promise.all([
       api.getProfitLoss(currentBusiness.id),
       api.getTrialBalance(currentBusiness.id),
@@ -74,6 +80,7 @@ export default function Dashboard() {
       api.getMonthlyTrend(currentBusiness.id, 13),
     ])
       .then(([plData, tb, entries, trend, invoiceList, trend13]) => {
+        if(!active) return;
         setPl(plData);
         setCashTotal(
           tb.rows.filter((r) => ["現金", "普通預金", "当座預金", "小口現金", "定期預金"].includes(r.name)).reduce((s, r) => s + r.balance, 0)
@@ -84,8 +91,10 @@ export default function Dashboard() {
         setMonthlyTrend(trend13);
         setCashTrend(trend);
       })
-      .finally(() => setLoading(false));
-  }, [currentBusiness]);
+      .catch(e=>{if(active)setLoadError(e instanceof Error?e.message:"ダッシュボードを読み込めませんでした");})
+      .finally(() => {if(active)setLoading(false);});
+    return ()=>{active=false;};
+  }, [currentBusiness,retry]);
 
   const unpaidInvoices = useMemo(() => invoices.filter((iv) => iv.status === "SENT"), [invoices]);
   const unpaidTotal = useMemo(() => unpaidInvoices.reduce((s, iv) => s + iv.total, 0), [unpaidInvoices]);
@@ -136,6 +145,7 @@ export default function Dashboard() {
   }
 
   const netIncome = pl?.summary.netIncome ?? 0;
+  if(loadError)return <div className="max-w-lg space-y-4"><h1 className="text-xl font-semibold">ダッシュボードを読み込めませんでした</h1><p role="alert" className="text-sm text-red-700">{loadError}</p><button type="button" onClick={()=>setRetry(value=>value+1)} className="rounded-lg border px-4 py-3 text-sm">再読み込み</button></div>;
 
   return (
     <div className="space-y-6">
@@ -145,6 +155,9 @@ export default function Dashboard() {
           仕訳を入力
         </Button>
       </div>
+
+      <MonthlyTasks />
+      <WorkQueue />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard icon={<Wallet size={18} />} label="現預金残高" value={formatYen(cashTotal)} />

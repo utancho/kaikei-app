@@ -3,19 +3,29 @@ import { createMiddleware } from "hono/factory";
 import { AUTH_COOKIE_NAME, verifyToken } from "../lib/auth.js";
 import { prisma } from "../lib/prisma.js";
 import type { AppEnv } from "../types/env.js";
+import { canWriteBusiness } from "../lib/memberPermissions.js";
+import { isSessionRevoked, matchesSecurityVersion } from "../lib/sessionSecurity.js";
+import { captureSession } from "../lib/identitySecurity.js";
 
 export const requireAuth = createMiddleware<AppEnv>(async (c, next) => {
   const token = getCookie(c, AUTH_COOKIE_NAME);
   if (!token) {
     return c.json({ error: "ログインが必要です" }, 401);
   }
+  let payload;
   try {
-    const payload = await verifyToken(token, c.env.JWT_SECRET);
-    c.set("userId", payload.userId);
-    await next();
+    payload = await verifyToken(token, c.env.JWT_SECRET);
   } catch {
     return c.json({ error: "ログインが必要です" }, 401);
   }
+  if (typeof payload.userId !== "string") return c.json({ error: "ログインが必要です" }, 401);
+  const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { securityVersion: true } });
+  if (!user || !matchesSecurityVersion(payload, user.securityVersion) || await isSessionRevoked(c.env.DB, token)) {
+    return c.json({ error: "セッションが終了しました。再度ログインしてください" }, 401);
+  }
+  c.set("userId", payload.userId);
+  await captureSession(c.env.DB, payload.userId, token, c.req.header('user-agent') ?? '', payload.exp, payload.securityVersion??0);
+  await next();
 });
 
 const ACTIVE_STATUSES = new Set(["TRIALING", "ACTIVE"]);
@@ -61,6 +71,12 @@ export const verifyBusinessAccess = createMiddleware<AppEnv>(async (c, next) => 
     return c.json({ error: "この事業者へのアクセス権がありません" }, 403);
   }
   c.set("business", { id: business.id, ownerId: business.ownerId });
+  if (business.ownerId !== userId) {
+    const member = await prisma.businessMember.findFirst({ where: { businessId, userId, status: "ACTIVE" } });
+    if (!member || !canWriteBusiness(member.role, c.req.method)) {
+      return c.json({ error: "閲覧専用の共有権限では変更できません", code: "READ_ONLY_ACCESS" }, 403);
+    }
+  }
   await next();
 });
 

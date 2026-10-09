@@ -1,4 +1,5 @@
 export interface Bindings {
+  ASSETS: Fetcher;
   DB: D1Database;
   AI: Ai;
   JWT_SECRET: string;
@@ -10,6 +11,7 @@ export interface Bindings {
   RESEND_API_KEY?: string;
   MAIL_FROM?: string;
   ENVIRONMENT?: string;
+  FREE_TIER_MODE?: string;
 }
 
 export interface Variables {

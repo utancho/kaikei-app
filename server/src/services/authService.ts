@@ -1,8 +1,7 @@
-import { prisma } from "../lib/prisma.js";
+import { prisma, requestDatabase } from "../lib/prisma.js";
 import { badRequest } from "../lib/httpError.js";
 import { hashPassword, signToken, verifyPassword } from "../lib/auth.js";
 import { verifyTOTP } from "../lib/totp.js";
-import { activatePendingInvites } from "./memberService.js";
 import { recordAudit, type AuditContext } from "./auditService.js";
 import { consumeBackupCode, countRemainingBackupCodes } from "./twoFactorService.js";
 
@@ -30,9 +29,10 @@ export async function signup(
   context?: AuditContext
 ) {
   if (password.length < 8) badRequest("パスワードは8文字以上で入力してください");
+  email = email.trim().toLowerCase();
 
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) badRequest("このメールアドレスは既に登録されています");
+  const existing = await prisma.$queryRaw<{ id: string }[]>`SELECT id FROM User WHERE lower(email)=lower(${email}) LIMIT 1`;
+  if (existing.length) badRequest("このメールアドレスは既に登録されています");
 
   const passwordHash = await hashPassword(password);
   const user = await prisma.user.create({
@@ -44,10 +44,10 @@ export async function signup(
     },
   });
 
-  await activatePendingInvites(user.id, user.email);
+  // Membership is activated only when the recipient accepts its secret link.
   await recordAudit({ action: "SIGNUP", userId: user.id, userEmail: user.email, context });
 
-  const token = await signToken({ userId: user.id }, jwtSecret);
+  const token = await signToken({ userId: user.id, securityVersion: user.securityVersion }, jwtSecret);
   return { user: sanitizeUser(user), token };
 }
 
@@ -58,7 +58,13 @@ export async function login(
   code?: string,
   context?: AuditContext
 ) {
-  const user = await prisma.user.findUnique({ where: { email } });
+  email = email.trim();
+  let user = await prisma.user.findUnique({ where: { email } });
+  // Preserve exact legacy accounts; allow case-insensitive login only when unambiguous.
+  if (!user) {
+    const matches = await prisma.$queryRaw<{ id: string }[]>`SELECT id FROM User WHERE lower(email)=lower(${email}) LIMIT 2`;
+    if (matches.length === 1) user = await prisma.user.findUnique({ where: { id: matches[0].id } });
+  }
   if (!user) {
     await recordAudit({ action: "LOGIN_FAILED", userEmail: email, detail: "ユーザーが存在しません", context });
     badRequest("メールアドレスまたはパスワードが正しくありません");
@@ -86,7 +92,7 @@ export async function login(
 
   await recordAudit({ action: "LOGIN_SUCCESS", userId: user!.id, userEmail: user!.email, context });
 
-  const token = await signToken({ userId: user!.id }, jwtSecret);
+  const token = await signToken({ userId: user!.id, securityVersion: user!.securityVersion }, jwtSecret);
   return { user: sanitizeUser(user!), token };
 }
 
@@ -95,8 +101,9 @@ export async function getMe(userId: string) {
   if (!user) return null;
   const subscription = await prisma.subscription.findUnique({ where: { userId } });
   const backupRemaining = user.twoFactorEnabled ? await countRemainingBackupCodes(userId) : 0;
+  const verified = await requestDatabase().prepare('SELECT emailVerifiedAt FROM User WHERE id=?').bind(userId).first<{emailVerifiedAt:string|null}>();
   return {
-    user: { ...sanitizeUser(user), twoFactorBackupCodesRemaining: backupRemaining },
+    user: { ...sanitizeUser(user), emailVerified: Boolean(verified?.emailVerifiedAt), twoFactorBackupCodesRemaining: backupRemaining },
     subscription,
   };
 }

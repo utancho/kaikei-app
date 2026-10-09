@@ -20,6 +20,12 @@ export async function sendEmail(env: Bindings, params: SendEmailParams): Promise
     return { sent: false, reason: "メール送信が未設定です(RESEND_API_KEY / MAIL_FROM)" };
   }
 
+  const day = new Date().toISOString().slice(0,10);
+  const reservation = await env.DB.prepare(`INSERT INTO EmailDailyUsage(day,attempts) VALUES (?,1)
+    ON CONFLICT(day) DO UPDATE SET attempts=attempts+1 WHERE attempts<90 RETURNING attempts`).bind(day).first();
+  if (!reservation) return { sent:false, reason:'メール送信の日次上限90通に達しました' };
+  await env.DB.prepare('DELETE FROM EmailDailyUsage WHERE day<?').bind(day).run();
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {

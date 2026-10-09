@@ -1,0 +1,4 @@
+import {useEffect} from 'react';
+import {updatePageSeo} from '../lib/pageSeo';
+import {Link} from 'react-router-dom';
+export default function EditorialPolicy(){useEffect(()=>{updatePageSeo('記事の編集方針 | keirio Journal','keirio Journalの出典確認、記事更新、一般的な記帳解説と個別の税務判断の区別について。');},[]);return <article className="marketing-container max-w-3xl py-16"><Link to="/blog" className="text-sm text-emerald-800 underline">Journalへ戻る</Link><h1 className="mt-8 font-display text-4xl">記事の編集方針</h1><div className="article-body mt-8"><p>編集・発行：keirio編集部。個人事業主と小さな法人に向けて、記帳と会計ソフトの操作を解説しています。</p><h2>公式資料と実装仕様を確認します</h2><p>説明用の仮例と実際の機能を区別し、制度の説明には参考資料と確認日を添えます。記事の作成にはAIの補助を利用しています。</p><h2>個別の税務判断は専門家へ</h2><p>税務に関する説明は一般的な情報です。税理士監修済みとは表示せず、個別の適用や税額計算は税理士・税務署へ確認してください。</p><h2>更新と訂正</h2><p>内容が変わった場合に更新日を変更します。順位のためだけに日付を書き換えません。誤りや古い情報のご連絡は<Link to="/legal/privacy" className="text-emerald-800 underline">お問い合わせ窓口</Link>をご利用ください。</p></div></article>;}

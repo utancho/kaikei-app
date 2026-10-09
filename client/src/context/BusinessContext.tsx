@@ -7,6 +7,7 @@ interface BusinessContextValue {
   businesses: Business[];
   currentBusiness: Business | null;
   loading: boolean;
+  error: string;
   setCurrentBusinessId: (id: string) => void;
   refresh: () => Promise<void>;
 }
@@ -17,11 +18,13 @@ const STORAGE_KEY = "kaikei.currentBusinessId";
 
 export function BusinessProvider({ children }: { children: ReactNode }) {
   const [businesses, setBusinesses] = useState<Business[]>([]);
-  const [currentId, setCurrentId] = useState<string | null>(localStorage.getItem(STORAGE_KEY));
+  const [currentId, setCurrentId] = useState<string | null>(()=>{try{return localStorage.getItem(STORAGE_KEY);}catch{return null;}});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
     setLoading(true);
+    setError("");
     try {
       const list = await api.listBusinesses();
       setBusinesses(list);
@@ -29,7 +32,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         if (prev && list.some((b) => b.id === prev)) return prev;
         return list[0]?.id ?? null;
       });
-    } finally {
+    } catch (e) { setError(e instanceof Error ? e.message : "事業者データを読み込めませんでした"); } finally {
       setLoading(false);
     }
   }, []);
@@ -39,14 +42,14 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   useEffect(() => {
-    if (currentId) localStorage.setItem(STORAGE_KEY, currentId);
+    if (currentId) { try { localStorage.setItem(STORAGE_KEY, currentId); } catch { /* selection remains usable */ } }
   }, [currentId]);
 
   const currentBusiness = businesses.find((b) => b.id === currentId) ?? null;
 
   return (
     <BusinessContext.Provider
-      value={{ businesses, currentBusiness, loading, setCurrentBusinessId: setCurrentId, refresh }}
+      value={{ businesses, currentBusiness, loading, error, setCurrentBusinessId: setCurrentId, refresh }}
     >
       {children}
     </BusinessContext.Provider>

@@ -10,7 +10,7 @@ import {
 
 export const signupInputSchema = z.object({
   email: z.string().email("有効なメールアドレスを入力してください"),
-  password: z.string().min(8, "パスワードは8文字以上で入力してください"),
+  password: z.string().min(8, "パスワードは8文字以上で入力してください").max(128),
   name: z.string().optional(),
 });
 
@@ -19,22 +19,25 @@ export const forgotPasswordSchema = z.object({
 });
 
 export const resetPasswordSchema = z.object({
-  token: z.string().min(1),
-  password: z.string().min(8, "パスワードは8文字以上で入力してください"),
+  token: z.string().regex(/^[a-f0-9]{64}$/),
+  password: z.string().min(8, "パスワードは8文字以上で入力してください").max(128),
 });
 
 export const twoFactorEnableSchema = z.object({
   code: z.string().min(6).max(8),
+  password: z.string().min(1).max(128),
 });
 
 export const twoFactorDisableSchema = z.object({
-  password: z.string().min(1),
+  password: z.string().min(1).max(128),
+  code: z.string().min(6).max(32),
 });
+export const twoFactorSetupSchema = z.object({ password: z.string().min(1).max(128) });
 
 export const loginInputSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1),
-  code: z.string().optional(),
+  password: z.string().min(1).max(128),
+  code: z.string().max(32).optional(),
 });
 
 export const businessInputSchema = z.object({

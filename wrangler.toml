@@ -8,15 +8,16 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = "./client/dist"
 binding = "ASSETS"
-not_found_handling = "single-page-application"
-run_worker_first = ["/api/*"]
+not_found_handling = "none"
+run_worker_first = true
 
 # この [vars] は `wrangler deploy` (本番) で使われる値。
 # ローカルの `wrangler dev` では .dev.vars の同名キーが優先されるため、
 # .dev.vars 側に development 用の値を書くこと(直接ここは書き換えない)。
 [vars]
-APP_URL = "https://kaikei-app.suzu-e97.workers.dev"
+APP_URL = "https://keirio-hub.com"
 ENVIRONMENT = "production"
+FREE_TIER_MODE = "true"
 
 [[d1_databases]]
 binding = "DB"

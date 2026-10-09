@@ -1,6 +1,9 @@
 import { Hono } from "hono";
-import { setCookie, deleteCookie } from "hono/cookie";
-import { AUTH_COOKIE_NAME } from "../lib/auth.js";
+import { setCookie, deleteCookie, getCookie } from "hono/cookie";
+import { AUTH_COOKIE_NAME, signToken, verifyToken } from "../lib/auth.js";
+import { revokeSession } from "../lib/sessionSecurity.js";
+import { bodyLimit } from "hono/body-limit";
+import { authAttemptLimit } from "../middleware/security.js";
 import {
   forgotPasswordSchema,
   loginInputSchema,
@@ -8,6 +11,7 @@ import {
   signupInputSchema,
   twoFactorDisableSchema,
   twoFactorEnableSchema,
+  twoFactorSetupSchema,
 } from "../lib/zodSchemas.js";
 import { getMe, login, signup } from "../services/authService.js";
 import { requestPasswordReset, resetPasswordWithToken } from "../services/passwordResetService.js";
@@ -17,6 +21,9 @@ import type { AppEnv } from "../types/env.js";
 import type { Context } from "hono";
 
 export const authRouter = new Hono<AppEnv>();
+authRouter.use("*", bodyLimit({ maxSize: 16 * 1024, onError: c => c.json({ error: "送信データが大きすぎます" }, 413) }));
+authRouter.use("/2fa/*", requireAuth);
+authRouter.use("*", authAttemptLimit);
 
 const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60; // 30日
 
@@ -65,29 +72,39 @@ authRouter.post("/forgot-password", async (c) => {
 
 authRouter.post("/reset-password", async (c) => {
   const { token, password } = resetPasswordSchema.parse(await c.req.json());
-  await resetPasswordWithToken(token, password, auditContext(c));
+  await resetPasswordWithToken(c.env.DB, token, password, auditContext(c));
   return c.json({ ok: true });
 });
 
 authRouter.post("/2fa/setup", requireAuth, async (c) => {
-  return c.json(await setupTwoFactor(c.get("userId")));
+  const { password } = twoFactorSetupSchema.parse(await c.req.json());
+  return c.json(await setupTwoFactor(c.get("userId"), password));
 });
 
 authRouter.post("/2fa/enable", requireAuth, async (c) => {
-  const { code } = twoFactorEnableSchema.parse(await c.req.json());
-  return c.json(await enableTwoFactor(c.get("userId"), code, auditContext(c)));
+  const { code, password } = twoFactorEnableSchema.parse(await c.req.json());
+  const result = await enableTwoFactor(c.env.DB, c.get("userId"), code, password, auditContext(c));
+  setSessionCookie(c, await signToken({ userId: c.get("userId"), securityVersion: result.securityVersion }, c.env.JWT_SECRET));
+  return c.json({ enabled: result.enabled, backupCodes: result.backupCodes });
 });
 
 authRouter.post("/2fa/backup-codes", requireAuth, async (c) => {
-  return c.json(await regenerateBackupCodes(c.get("userId")));
+  const { password, code } = twoFactorDisableSchema.parse(await c.req.json());
+  return c.json(await regenerateBackupCodes(c.env.DB, c.get("userId"), password, code, auditContext(c)));
 });
 
 authRouter.post("/2fa/disable", requireAuth, async (c) => {
-  const { password } = twoFactorDisableSchema.parse(await c.req.json());
-  return c.json(await disableTwoFactor(c.get("userId"), password, auditContext(c)));
+  const { password, code } = twoFactorDisableSchema.parse(await c.req.json());
+  const result = await disableTwoFactor(c.get("userId"), password, code, auditContext(c));
+  setSessionCookie(c, await signToken({ userId: c.get("userId"), securityVersion: result.securityVersion }, c.env.JWT_SECRET));
+  return c.json({ enabled: result.enabled });
 });
 
-authRouter.post("/logout", (c) => {
+authRouter.post("/logout", async (c) => {
+  const token = getCookie(c, AUTH_COOKIE_NAME);
+  let payload;
+  if (token) { try { payload = await verifyToken(token, c.env.JWT_SECRET); } catch { /* expired/invalid is already unusable */ } }
+  if (token && payload) await revokeSession(c.env.DB, token, payload.exp);
   deleteCookie(c, AUTH_COOKIE_NAME, { path: "/" });
   return c.body(null, 204);
 });

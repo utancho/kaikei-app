@@ -1,3 +1,4 @@
+import { KeirioIcon } from "../components/KeirioIcon";
 import { useState } from "react";
 import { CheckCircle2, LogOut, Wallet } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -42,10 +43,8 @@ export default function Billing() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="flex items-center gap-2 justify-center mb-6">
-          <div className="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center">
-            <Wallet size={20} className="text-white" />
-          </div>
-          <div className="text-xl font-bold text-gray-900">Kaikei</div>
+          <KeirioIcon size={36} />
+          <div className="text-xl font-bold text-gray-900">keirio</div>
         </div>
 
         <Card className="p-8">

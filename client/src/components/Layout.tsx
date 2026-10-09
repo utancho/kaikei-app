@@ -1,3 +1,4 @@
+import { KeirioIcon } from "./KeirioIcon";
 import { NavLink, Outlet, Link } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -12,7 +13,6 @@ import {
   ListTree,
   Settings as SettingsIcon,
   ChevronsUpDown,
-  Wallet,
   Package,
   Repeat,
   FileBadge,
@@ -47,7 +47,7 @@ interface NavItem {
 
 const NAV_GROUPS: { heading?: string; items: NavItem[] }[] = [
   {
-    items: [{ to: "/", label: "ダッシュボード", end: true, icon: LayoutDashboard }],
+    items: [{ to: "/app", label: "ダッシュボード", end: true, icon: LayoutDashboard }],
   },
   {
     heading: "取引入力",
@@ -84,6 +84,8 @@ const NAV_GROUPS: { heading?: string; items: NavItem[] }[] = [
     items: [
       { to: "/accounts", label: "勘定科目", icon: ListTree },
       { to: "/settings", label: "設定", icon: SettingsIcon },
+      { to: "/operations", label: "実務管理", icon: ClipboardCheck },
+      { to: "/account-security", label: "アカウント安全管理", icon: ShieldCheck },
     ],
   },
 ];
@@ -113,11 +115,9 @@ export function Layout() {
       >
         <div className="px-4 py-5 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brand-500 flex items-center justify-center shrink-0">
-              <Wallet size={18} className="text-white" />
-            </div>
+            <KeirioIcon size={36} />
             <div>
-              <div className="text-base font-bold tracking-wide leading-none">Kaikei</div>
+              <div className="text-base font-bold tracking-wide leading-none">keirio</div>
               <div className="text-[11px] text-brand-300 mt-0.5">会計ソフト</div>
             </div>
           </div>
@@ -260,6 +260,7 @@ export function Layout() {
           </div>
         </header>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-gray-50">
+          {currentBusiness?.accessRole === "VIEWER" && <p role="status" className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">閲覧専用の共有ワークスペースです。仕訳や設定の変更はできません。</p>}
           <Outlet />
         </main>
       </div>

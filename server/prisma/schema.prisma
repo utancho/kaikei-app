@@ -22,6 +22,7 @@ model User {
   role             String   @default("USER") // USER | ADMIN
   twoFactorEnabled Boolean  @default(false)
   twoFactorSecret  String?
+  securityVersion  Int      @default(0)
   createdAt        DateTime @default(now())
 
   businesses   Business[]
@@ -62,6 +63,26 @@ model AuditLog {
 
   @@index([userId])
   @@index([createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// 公開ブログ
+// ---------------------------------------------------------------------------
+model BlogPost {
+  id            String    @id @default(cuid())
+  slug          String    @unique
+  title         String
+  excerpt       String?
+  content       String
+  coverImageUrl String?
+  category      String?
+  published     Boolean   @default(false)
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([published, publishedAt])
+  @@index([category])
 }
 
 model Subscription {
@@ -176,7 +197,9 @@ model BusinessMember {
   userId     String? // 招待したメールに一致するアカウントがまだ無い間はnull
   user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   email      String // 招待先メールアドレス(このメールで後からサインアップした際に自動で紐付ける)
-  role       String    @default("MEMBER") // MEMBER のみ(将来の拡張余地として保持)
+  role       String    @default("MEMBER") // MEMBER | VIEWER
+  inviteTokenHash String? @unique
+  inviteExpiresAt DateTime?
   status     String    @default("PENDING") // PENDING(未参加) | ACTIVE(参加済み)
   invitedAt  DateTime  @default(now())
   joinedAt   DateTime?

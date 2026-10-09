@@ -1,232 +1,71 @@
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Wallet,
-  BookText,
-  Upload,
-  FileText,
-  Package,
-  FileBadge,
-  BarChart3,
-  CheckCircle2,
-  ArrowRight,
-  Download,
-  Apple,
-  MonitorDown,
-} from "lucide-react";
-import { Button } from "../components/ui/Button";
+import { ArrowDown, ArrowUpRight, ArrowRight, Apple, Monitor, Pause, Play } from "lucide-react";
+import FeatureCarousel from "../components/FeatureCarousel";
+import { MarketingFooter, MarketingHeader } from "../components/MarketingChrome";
+import { Scene } from "../components/StructureFlowScene";
+import "../studio.css";
+import ProductDemo, { FeatureFinder } from "../components/ProductDemo";
+import "../refined.css";
+import HelpCenter from "../components/HelpCenter";
+import EntranceIntro from "../components/EntranceIntro";
+import LaunchJournal from "../components/LaunchJournal";
+import ScrollWorkflow from "../components/ScrollWorkflow";
+import { useMarketingMotion } from "../hooks/useMarketingMotion";
+import "../motion.css";
+import { updatePageSeo } from "../lib/pageSeo";
 
-const RELEASES_BASE = "https://github.com/utancho/kaikei-releases/releases/latest/download";
-
-const FEATURES = [
-  {
-    icon: BookText,
-    title: "かんたん複式簿記",
-    description: "借方・貸方のバランスをリアルタイムで検証。簿記の知識がなくても迷わず仕訳できます。",
-  },
-  {
-    icon: Upload,
-    title: "明細を自動で取込",
-    description: "銀行・カードのCSV明細をアップロードするだけで、勘定科目を自動で提案し仕訳化します。",
-  },
-  {
-    icon: FileText,
-    title: "請求書もそのまま記帳",
-    description: "作成した請求書はワンクリックで売上仕訳に。入金があれば消込までこの画面で完結。",
-  },
-  {
-    icon: Package,
-    title: "固定資産・減価償却",
-    description: "資産を登録するだけで、定額法・定率法の減価償却費を自動計算し、期末に仕訳計上。",
-  },
-  {
-    icon: FileBadge,
-    title: "青色申告決算書に対応",
-    description: "収支から控除額まで自動集計。確定申告の直前でも慌てず準備できます。",
-  },
-  {
-    icon: BarChart3,
-    title: "経営状況がひと目でわかる",
-    description: "現預金推移・月次損益・取引先別残高をグラフとレポートでいつでも確認。",
-  },
-];
-
-const FAQS = [
-  {
-    q: "簿記の知識がなくても使えますか?",
-    a: "はい。勘定科目は日本語でグループ表示され、貸借のバランスは自動でチェックされるので、迷わず入力できます。",
-  },
-  {
-    q: "無料期間はありますか?",
-    a: "はい、登録から14日間は無料ですべての機能をお試しいただけます。期間終了後は自動で有料プランに切り替わります。",
-  },
-  {
-    q: "個人事業主・法人どちらでも使えますか?",
-    a: "どちらにも対応しています。事業形態に応じて勘定科目や決算書のフォーマットが自動で切り替わります。",
-  },
-  {
-    q: "解約はいつでもできますか?",
-    a: "はい。設定画面からいつでも解約でき、違約金などは発生しません。",
-  },
-];
-
+const RELEASES = "https://github.com/utancho/kaikei-releases/releases/latest/download";
 export default function Landing() {
-  return (
-    <div className="min-h-screen bg-white">
-      <header className="border-b border-gray-100">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-lg bg-brand-600 flex items-center justify-center">
-              <Wallet size={18} className="text-white" />
-            </div>
-            <span className="font-bold text-gray-900">Kaikei</span>
+  const [motion, setMotion] = useState(false);
+  useMarketingMotion(motion);
+  useEffect(() => {
+    updatePageSeo("keirio | 個人事業主・小さな法人の会計ソフト","銀行CSV取込、仕訳、請求書、月次レポート、税理士共有をひとつに。プラン申込みから14日間無料。");
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setMotion(!preference.matches);
+    const update = () => setMotion(!preference.matches);
+    preference.addEventListener("change", update);
+    return () => preference.removeEventListener("change", update);
+  }, []);
+  return <div className="marketing-site keirio-studio">
+    <EntranceIntro />
+    <div className="motion-progress" aria-hidden="true" />
+    <a className="studio-skip" href="#main-content">本文へスキップ</a>
+    <MarketingHeader />
+    <main id="main-content">
+      <section className="studio-hero">
+        <div className="studio-field" aria-hidden="true">{motion && <Scene />}</div>
+        <div className="studio-scrim" aria-hidden="true" />
+        <div className="studio-container studio-hero-content">
+          <div className="studio-kicker"><span>keirio / 会計のワークスペース</span><span>記帳・請求・決算</span></div>
+          <div className="refined-hero-grid"><div className="refined-hero-copy"><p className="refined-eyebrow">個人事業主・小さな法人のための会計</p><h1>経理に追われず、<br /><span>経営と向き合う。</span></h1>
+          <div className="studio-hero-bottom">
+            <p>明細を取り込み、仕訳を確認。<br />請求書も、月末のレポートも、同じ場所で。</p>
+            <div className="studio-hero-actions"><Link className="studio-cta" to="/signup">14日間、無料で試す <ArrowUpRight size={21} /></Link><a className="studio-text-link" href="#features">プロダクトを見る <ArrowDown size={17} /></a></div>
           </div>
-          <div className="flex items-center gap-3">
-            <Link to="/login" className="text-sm text-gray-600 hover:text-gray-900">
-              ログイン
-            </Link>
-            <Link to="/signup">
-              <Button size="sm">無料で始める</Button>
-            </Link>
-          </div>
+          <div className="studio-hero-meta"><span>月額1,980円（税込）· プラン申込みから14日間無料</span><button onClick={() => setMotion(!motion)} aria-pressed={motion} aria-label={motion ? "サイトの動きを停止" : "サイトの動きを再生"}>{motion ? <Pause size={14} /> : <Play size={14} />} <span>{motion ? "動きを停止" : "動きを再生"}</span></button></div>
+          </div><ProductDemo /></div>
         </div>
-      </header>
-
-      <section className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
-        <div className="inline-flex items-center gap-1.5 bg-brand-50 text-brand-700 text-xs font-medium px-3 py-1 rounded-full mb-6">
-          個人事業主・法人向けクラウド会計
-        </div>
-        <h1 className="text-4xl sm:text-5xl font-bold text-gray-900 tracking-tight leading-tight mb-6">
-          記帳の悩みを、
-          <br />
-          <span className="text-brand-600">最短ルート</span>で終わらせる。
-        </h1>
-        <p className="text-lg text-gray-500 max-w-2xl mx-auto mb-10">
-          仕訳入力から請求書、銀行明細の取込、青色申告決算書まで。日々の記帳をひとつの画面でシンプルに。
-        </p>
-        <div className="flex items-center justify-center gap-3">
-          <Link to="/signup">
-            <Button size="md" icon={<ArrowRight size={16} />} className="px-6 py-3 text-base">
-              14日間無料で試す
-            </Button>
-          </Link>
-          <Link to="/login">
-            <Button variant="secondary" size="md" className="px-6 py-3 text-base">
-              ログイン
-            </Button>
-          </Link>
-        </div>
-        <p className="text-xs text-gray-400 mt-4">クレジットカード登録は無料期間終了前でOK</p>
+        <div className="studio-watermark" aria-hidden="true">keirio</div>
       </section>
-
-      <section className="max-w-4xl mx-auto px-6 pb-16">
-        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-6 sm:p-8 text-center">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">デスクトップアプリもあります</h2>
-          <p className="text-sm text-gray-500 mb-6">ブラウザ不要。Mac / Windows にインストールしてすぐ使えます。</p>
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a href={`${RELEASES_BASE}/Kaikei.dmg`}>
-              <Button variant="secondary" icon={<Apple size={16} />} className="px-5 py-2.5">
-                Macでダウンロード
-              </Button>
-            </a>
-            <a href={`${RELEASES_BASE}/Kaikei-Setup.exe`}>
-              <Button variant="secondary" icon={<MonitorDown size={16} />} className="px-5 py-2.5">
-                Windowsでダウンロード
-              </Button>
-            </a>
-          </div>
-          <p className="text-xs text-gray-400 mt-4 flex items-center justify-center gap-1">
-            <Download size={12} />
-            初回起動時、未署名アプリの警告が表示される場合があります(詳細から実行できます)
-          </p>
-        </div>
+      <div className="refined-benefits studio-container"><span>仕訳・請求・決算をひとつに</span><span>Mac / Windows対応</span><span>14日間すべての機能を試せる</span></div>
+      <FeatureFinder />
+      <section className="studio-intro studio-container">
+        <div className="studio-section-label">会計の道具として</div>
+        <div><h2>数字を整える。<br /><span>仕事が動き出す。</span></h2><div className="studio-intro-copy"><p>月末の入力も、請求書の管理も、決算前の確認も。別々だった作業を、ひとつのワークスペースに。</p><p>必要な情報をすぐに見つけ、取引からレポートまで自然につながる。keirioは、毎日の会計のための道具です。</p></div></div>
       </section>
-
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-6xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">記帳に必要な機能を、ぜんぶひとつに</h2>
-          <p className="text-center text-gray-500 mb-12">日々の入力から決算書の準備まで、これひとつで完結します</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map((f) => (
-              <div key={f.title} className="bg-white rounded-xl border border-gray-200 p-6">
-                <div className="w-10 h-10 rounded-lg bg-brand-50 flex items-center justify-center mb-4">
-                  <f.icon size={20} className="text-brand-600" />
-                </div>
-                <h3 className="font-semibold text-gray-900 mb-1.5">{f.title}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{f.description}</p>
-              </div>
-            ))}
-          </div>
-        </div>
+      <section id="features" className="studio-features studio-container">
+        <div className="studio-section-top"><span className="studio-section-label">できること</span><span className="studio-micro">操作画面のイメージ</span></div>
+        <h2 className="studio-display">日々の取引から、<br />次の判断まで。</h2>
+        <div className="studio-carousel"><FeatureCarousel /></div>
+        <div className="studio-specs">{[["INPUT", "銀行・カード明細のCSV取込"], ["INVOICE", "請求書と売上仕訳を連携"], ["REPORT", "損益・残高・資金繰りを確認"], ["CLOSING", "固定資産・決算帳票を集計"]].map(([tag, text]) => <div key={tag}><span>{tag}</span><p>{text}</p></div>)}</div>
       </section>
-
-      <section className="max-w-2xl mx-auto px-6 py-20">
-        <h2 className="text-2xl font-bold text-center text-gray-900 mb-2">シンプルな料金プラン</h2>
-        <p className="text-center text-gray-500 mb-10">複雑な料金体系はありません。すべての機能が使えて月額ひとつだけ。</p>
-        <div className="bg-white border-2 border-brand-500 rounded-2xl p-8 shadow-sm">
-          <div className="text-center mb-6">
-            <div className="text-sm text-gray-500 mb-1">スタンダードプラン</div>
-            <div className="flex items-baseline justify-center gap-1">
-              <span className="text-4xl font-bold text-gray-900">¥1,980</span>
-              <span className="text-gray-500">/ 月(税込)</span>
-            </div>
-            <div className="text-xs text-brand-600 mt-2">初回14日間は無料</div>
-          </div>
-          <ul className="space-y-2.5 mb-8">
-            {[
-              "事業者数の制限なし",
-              "仕訳・請求書・帳票すべての機能",
-              "銀行/カード明細の自動取込",
-              "固定資産台帳・青色申告決算書",
-              "メールでのサポート",
-            ].map((f) => (
-              <li key={f} className="flex items-center gap-2 text-sm text-gray-700">
-                <CheckCircle2 size={16} className="text-brand-500 shrink-0" />
-                {f}
-              </li>
-            ))}
-          </ul>
-          <Link to="/signup" className="block">
-            <Button className="w-full justify-center py-3 text-base">14日間無料で始める</Button>
-          </Link>
-        </div>
-      </section>
-
-      <section className="bg-gray-50 py-20">
-        <div className="max-w-2xl mx-auto px-6">
-          <h2 className="text-2xl font-bold text-center text-gray-900 mb-10">よくあるご質問</h2>
-          <div className="space-y-6">
-            {FAQS.map((f) => (
-              <div key={f.q}>
-                <h3 className="font-semibold text-gray-900 mb-1.5">{f.q}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{f.a}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <footer className="border-t border-gray-100 py-8">
-        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-gray-400">
-          <span>&copy; {new Date().getFullYear()} Kaikei</span>
-          <nav className="flex items-center gap-5">
-            <Link to="/legal/tokushoho" className="hover:text-gray-600">
-              特定商取引法に基づく表示
-            </Link>
-            <Link to="/legal/privacy" className="hover:text-gray-600">
-              プライバシーポリシー
-            </Link>
-            <Link to="/legal/terms" className="hover:text-gray-600">
-              利用規約
-            </Link>
-          </nav>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded bg-brand-600 flex items-center justify-center">
-              <Wallet size={14} className="text-white" />
-            </div>
-            <span className="font-medium text-gray-600">Kaikei</span>
-          </div>
-        </div>
-      </footer>
-    </div>
-  );
+      <ScrollWorkflow motion={motion} />
+      <section id="pricing" className="studio-container studio-pricing"><div><div className="studio-section-label">料金プラン</div><h2 className="studio-display">明快な料金。<br />すべての機能。</h2><p>仕訳、請求書、帳票、経営レポート。<br />ひとつのプランにまとめました。</p></div><div className="studio-plan"><div className="studio-plan-top"><span>STANDARD</span><span>14日間無料</span></div><div className="studio-price">¥1,980<span>/ 月・税込</span></div><ul>{["事業者数の制限なし", "仕訳・請求書・各種帳票", "明細取込・固定資産管理", "経営レポート・決算準備"].map(item => <li key={item}><ArrowRight size={14} />{item}</li>)}</ul><Link className="studio-cta" to="/signup">無料で始める <ArrowUpRight size={21} /></Link><p className="studio-plan-note">申込画面で課金開始日・解約条件を確認できます</p></div></section>
+      <LaunchJournal />
+      <section className="studio-container studio-utilities"><div><div className="studio-section-label">DESKTOP</div><h2>いつものPCで。</h2><p>Mac・Windows向けアプリも利用できます。</p><div className="studio-downloads"><a href={RELEASES + "/Kaikei.dmg"}><Apple size={20} /> macOS <ArrowUpRight size={16} /></a><a href={RELEASES + "/Kaikei-Setup.exe"}><Monitor size={20} /> Windows <ArrowUpRight size={16} /></a></div><small>初回起動時に未署名アプリの警告が表示される場合があります。</small></div><div className="data-note"><div className="studio-section-label">データの扱いを、わかりやすく。</div><h2>安心して始めるために。</h2><p>認証には二要素認証を用意しています。会計データはクラウドに、月次タスクはこのブラウザに保存されます。</p><div className="data-note-links"><Link to="/legal/privacy">データの取扱い →</Link><Link to="/legal/tokushoho">料金・解約の条件 →</Link></div></div></section>
+      <HelpCenter />
+      <section className="studio-final studio-container"><span className="studio-section-label">まずは操作を試してみてください</span><h2>次の一歩を、<br />ここから。</h2><Link className="studio-cta" to="/signup">keirioを無料で試す <ArrowUpRight size={22} /></Link></section>
+    </main><MarketingFooter />
+  </div>;
 }

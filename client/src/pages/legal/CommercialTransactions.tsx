@@ -9,28 +9,24 @@ const ROWS: [string, string][] = [
   ["販売価格", "スタンダードプラン ¥1,980 / 月(税込)"],
   ["商品代金以外の必要料金", "インターネット接続に伴う通信費はお客様のご負担となります。"],
   ["お支払い方法", "クレジットカード決済(Stripe)"],
-  ["お支払い時期", "初回登録時に決済し、以降は毎月同日に自動更新・課金されます。"],
-  ["サービス提供時期", "決済完了後、直ちにご利用いただけます。"],
+  ["お支払い時期", "Stripeの申込画面でプランの申込みを完了した日から14日間は無料です。無料期間終了後に初回の月額料金が発生し、以降は月ごとに自動更新・課金されます。具体的な課金開始日・更新日は申込画面およびお支払い管理画面でご確認ください。"],
+  ["サービス提供時期", "プランの申込み完了後、無料期間を含めてご利用いただけます。"],
+  ["解約方法", "ログイン後の「設定」→「お支払い方法・プランを管理」から手続きを行えます。次回更新前に解約した場合、以降の更新分の請求は発生しません。"],
   [
     "返品・キャンセルについて",
-    "本サービスはソフトウェアの利用権を提供する性質上、役務提供開始後の返金には原則応じられません。解約はマイページからいつでも可能で、解約後は次回更新日以降の請求は発生しません。初回登録から14日間は無料トライアル期間です。",
+    "本サービスはソフトウェアの利用権を提供する性質上、役務提供開始後の返金には原則応じられません。ただし法令上返金が必要な場合を除きます。プランの申込みから14日間は無料期間です。解約方法は上記をご確認ください。",
   ],
 ];
 
 export default function CommercialTransactions() {
   return (
-    <LegalLayout title="特定商取引法に基づく表示" updatedAt="2026年10月4日">
+    <LegalLayout title="特定商取引法に基づく表示" updatedAt="2026年10月8日">
       <p>特定商取引法に基づき、以下のとおり表示いたします。</p>
-      <table className="w-full border-collapse">
-        <tbody>
+      <dl className="legal-facts">
           {ROWS.map(([label, value]) => (
-            <tr key={label} className="border-t border-gray-100 first:border-t-0">
-              <th className="text-left align-top py-3 pr-4 w-40 shrink-0 font-medium text-gray-500 whitespace-nowrap">{label}</th>
-              <td className="py-3 text-gray-800">{value}</td>
-            </tr>
+            <div key={label}><dt>{label}</dt><dd>{value}</dd></div>
           ))}
-        </tbody>
-      </table>
+      </dl>
     </LegalLayout>
   );
 }

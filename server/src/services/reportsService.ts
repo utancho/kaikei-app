@@ -1,4 +1,5 @@
 import { prisma } from "../lib/prisma.js";
+import { attachLineReferences } from "../lib/businessReferences.js";
 import type { AccountCategory, NormalBalance } from "../lib/enums.js";
 
 interface Totals {
@@ -15,6 +16,7 @@ async function sumLinesByAccount(
     where: {
       account: { businessId },
       journalEntry: {
+        businessId,
         status: "CONFIRMED",
         entryDate: where,
       },
@@ -78,19 +80,18 @@ export async function getGeneralLedger(
     priorTotals.get(accountId) ?? { debit: 0, credit: 0 }
   );
 
-  const lines = await prisma.journalEntryLine.findMany({
+  const rawLines = await prisma.journalEntryLine.findMany({
     where: {
       accountId,
       journalEntry: { businessId, status: "CONFIRMED", entryDate: { gte: from, lte: to } },
     },
     include: {
       journalEntry: true,
-      partner: true,
-      subAccount: true,
       taxCategory: true,
     },
     orderBy: [{ journalEntry: { entryDate: "asc" } }, { journalEntry: { entryNumber: "asc" } }, { lineNumber: "asc" }],
   });
+  const lines = await attachLineReferences(businessId, rawLines);
 
   let running = openingBalance;
   const rows = lines.map((l) => {
@@ -262,7 +263,7 @@ export async function getPartnerBalances(businessId: string) {
     if (!accountId) return [];
     const grouped = await prisma.journalEntryLine.groupBy({
       by: ["partnerId", "side"],
-      where: { accountId, partnerId: { not: null }, journalEntry: { status: "CONFIRMED" } },
+      where: { accountId, partnerId: { not: null }, partner: { businessId }, journalEntry: { businessId, status: "CONFIRMED" } },
       _sum: { amount: true },
     });
 
@@ -275,7 +276,7 @@ export async function getPartnerBalances(businessId: string) {
       totalsByPartner.set(row.partnerId, entry);
     }
 
-    const partners = await prisma.partner.findMany({ where: { id: { in: [...totalsByPartner.keys()] } } });
+    const partners = await prisma.partner.findMany({ where: { businessId, id: { in: [...totalsByPartner.keys()] } } });
     const nameById = new Map(partners.map((p) => [p.id, p.name]));
 
     return [...totalsByPartner.entries()]
@@ -508,11 +509,14 @@ export async function getBusinessAnalysis(businessId: string, from: Date, to: Da
 }
 
 export async function getJournalBook(businessId: string, from?: Date, to?: Date) {
-  return prisma.journalEntry.findMany({
+  const entries = await prisma.journalEntry.findMany({
     where: { businessId, status: "CONFIRMED", entryDate: { gte: from, lte: to } },
     include: {
-      lines: { include: { account: true, partner: true }, orderBy: { lineNumber: "asc" } },
+      lines: { orderBy: { lineNumber: "asc" } },
     },
     orderBy: [{ entryDate: "asc" }, { entryNumber: "asc" }],
   });
+  const lines = await attachLineReferences(businessId, entries.flatMap(e => e.lines));
+  const byId = new Map(lines.map(l => [l.id, l]));
+  return entries.map(e => ({ ...e, lines: e.lines.map(l => byId.get(l.id)!) }));
 }

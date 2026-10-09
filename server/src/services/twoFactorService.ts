@@ -24,14 +24,12 @@ async function sha256Hex(input: string): Promise<string> {
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function createBackupCodes(userId: string): Promise<string[]> {
-  await prisma.twoFactorBackupCode.deleteMany({ where: { userId } });
+async function createBackupCodes(db: D1Database, userId: string, securityVersion: number): Promise<string[]> {
   const codes = Array.from({ length: BACKUP_CODE_COUNT }, generateBackupCode);
-  for (const code of codes) {
-    await prisma.twoFactorBackupCode.create({
-      data: { userId, codeHash: await sha256Hex(normalizeBackupCode(code)) },
-    });
-  }
+  const inserts = await Promise.all(codes.map(async code => db.prepare('INSERT INTO TwoFactorBackupCode(id,userId,codeHash,createdAt) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM User WHERE id=? AND securityVersion=? AND twoFactorEnabled=1)')
+    .bind(crypto.randomUUID(), userId, await sha256Hex(normalizeBackupCode(code)), new Date().toISOString(), userId, securityVersion)));
+  const result = await db.batch([db.prepare('DELETE FROM TwoFactorBackupCode WHERE userId=? AND EXISTS (SELECT 1 FROM User WHERE id=? AND securityVersion=? AND twoFactorEnabled=1)').bind(userId, userId, securityVersion), ...inserts]);
+  if (result.slice(1).some(r => r.meta.changes !== 1)) badRequest("認証状態が変更されました。再度ログインしてください");
   return codes;
 }
 
@@ -42,17 +40,22 @@ export async function countRemainingBackupCodes(userId: string): Promise<number>
 /** ログイン時にバックアップコードを1回だけ消費して検証する。 */
 export async function consumeBackupCode(userId: string, code: string): Promise<boolean> {
   const hash = await sha256Hex(normalizeBackupCode(code));
-  const record = await prisma.twoFactorBackupCode.findFirst({ where: { userId, codeHash: hash, usedAt: null } });
-  if (!record) return false;
-  await prisma.twoFactorBackupCode.update({ where: { id: record.id }, data: { usedAt: new Date() } });
-  return true;
+  const result = await prisma.twoFactorBackupCode.updateMany({ where: { userId, codeHash: hash, usedAt: null }, data: { usedAt: new Date() } });
+  return result.count === 1;
 }
 
-export async function regenerateBackupCodes(userId: string) {
+async function verifyFactor(userId: string, secret: string | null, code: string) {
+  if (!(secret && await verifyTOTP(secret, code)) && !await consumeBackupCode(userId, code)) badRequest("認証コードが正しくありません");
+}
+
+export async function regenerateBackupCodes(db: D1Database, userId: string, password: string, code: string, context?: AuditContext) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) badRequest("ユーザーが見つかりません");
   if (!user!.twoFactorEnabled) badRequest("二要素認証が有効ではありません");
-  const codes = await createBackupCodes(userId);
+  if (!await verifyPassword(password, user!.passwordHash)) badRequest("パスワードが正しくありません");
+  await verifyFactor(userId, user!.twoFactorSecret, code);
+  const codes = await createBackupCodes(db, userId, user!.securityVersion);
+  await recordAudit({ action: "TWO_FACTOR_BACKUP_REGENERATED", userId, userEmail: user!.email, context });
   return { backupCodes: codes };
 }
 
@@ -60,42 +63,48 @@ export async function regenerateBackupCodes(userId: string) {
  * 認証アプリ登録用のシークレットを生成して保存する(この時点では未有効)。
  * ユーザーがアプリで生成したコードを検証して初めて有効化する。
  */
-export async function setupTwoFactor(userId: string) {
+export async function setupTwoFactor(userId: string, password: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) badRequest("ユーザーが見つかりません");
   if (user!.twoFactorEnabled) badRequest("二要素認証はすでに有効です");
+  if (!await verifyPassword(password, user!.passwordHash)) badRequest("パスワードが正しくありません");
 
   const secret = generateBase32Secret();
-  await prisma.user.update({ where: { id: userId }, data: { twoFactorSecret: secret } });
+  const changed = await prisma.user.updateMany({ where: { id: userId, securityVersion: user!.securityVersion, twoFactorEnabled: false }, data: { twoFactorSecret: secret } });
+  if (changed.count !== 1) badRequest("認証状態が変更されました。再度ログインしてください");
   return { secret, otpauthUrl: buildOtpauthUrl(secret, user!.email) };
 }
 
-export async function enableTwoFactor(userId: string, code: string, context?: AuditContext) {
+export async function enableTwoFactor(db: D1Database, userId: string, code: string, password: string, context?: AuditContext) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) badRequest("ユーザーが見つかりません");
   if (user!.twoFactorEnabled) badRequest("二要素認証はすでに有効です");
   if (!user!.twoFactorSecret) badRequest("先に設定を開始してください");
+  if (!await verifyPassword(password, user!.passwordHash)) badRequest("パスワードが正しくありません");
 
   const ok = await verifyTOTP(user!.twoFactorSecret, code);
   if (!ok) badRequest("認証コードが正しくありません。アプリの時刻同期をご確認ください");
 
-  await prisma.user.update({ where: { id: userId }, data: { twoFactorEnabled: true } });
-  const backupCodes = await createBackupCodes(userId);
+  const changed = await prisma.user.updateMany({ where: { id: userId, securityVersion: user!.securityVersion, twoFactorEnabled: false, twoFactorSecret: user!.twoFactorSecret }, data: { twoFactorEnabled: true, securityVersion: { increment: 1 } } });
+  if (changed.count !== 1) badRequest("認証状態が変更されました。再度ログインしてください");
+  const backupCodes = await createBackupCodes(db, userId, user!.securityVersion + 1);
   await recordAudit({ action: "TWO_FACTOR_ENABLED", userId, userEmail: user!.email, context });
-  return { enabled: true, backupCodes };
+  return { enabled: true, backupCodes, securityVersion: user!.securityVersion + 1 };
 }
 
 /** 本人がパスワード確認のうえ二要素認証を無効化する。 */
-export async function disableTwoFactor(userId: string, password: string, context?: AuditContext) {
+export async function disableTwoFactor(userId: string, password: string, code: string, context?: AuditContext) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user) badRequest("ユーザーが見つかりません");
   if (!user!.twoFactorEnabled) badRequest("二要素認証は有効になっていません");
 
   const ok = await verifyPassword(password, user!.passwordHash);
   if (!ok) badRequest("パスワードが正しくありません");
+  await verifyFactor(userId, user!.twoFactorSecret, code);
 
-  await prisma.user.update({ where: { id: userId }, data: { twoFactorEnabled: false, twoFactorSecret: null } });
+  const changed = await prisma.user.updateMany({ where: { id: userId, securityVersion: user!.securityVersion, twoFactorEnabled: true }, data: { twoFactorEnabled: false, twoFactorSecret: null, securityVersion: { increment: 1 } } });
+  if (changed.count !== 1) badRequest("認証状態が変更されました。再度ログインしてください");
   await prisma.twoFactorBackupCode.deleteMany({ where: { userId } });
   await recordAudit({ action: "TWO_FACTOR_DISABLED", userId, userEmail: user!.email, detail: "本人による無効化", context });
-  return { enabled: false };
+  return { enabled: false, securityVersion: user!.securityVersion + 1 };
 }

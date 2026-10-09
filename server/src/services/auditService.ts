@@ -1,6 +1,8 @@
-import { prisma } from "../lib/prisma.js";
+import { prisma, requestDatabase } from "../lib/prisma.js";
+import { addAccountNotification } from '../lib/identitySecurity.js';
 
 export type AuditAction =
+  | "TWO_FACTOR_BACKUP_REGENERATED"
   | "LOGIN_SUCCESS"
   | "LOGIN_FAILED"
   | "SIGNUP"
@@ -37,6 +39,9 @@ export async function recordAudit(params: {
         userAgent: params.context?.userAgent ?? null,
       },
     });
+    if (params.userId && (params.action === 'LOGIN_SUCCESS' || params.action === 'LOGIN_FAILED')) {
+      await addAccountNotification(requestDatabase(),params.userId,params.action,params.action === 'LOGIN_SUCCESS' ? '新しいログインがありました' : 'ログインに失敗した試行がありました');
+    }
   } catch {
     // 監査ログの失敗は本処理に影響させない
   }

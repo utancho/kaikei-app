@@ -1,6 +1,8 @@
-import { prisma } from "../lib/prisma.js";
+import { prisma, requestDatabase } from "../lib/prisma.js";
 import { badRequest, notFound } from "../lib/httpError.js";
 import { getOrCreateFiscalYearForDate } from "./fiscalYearService.js";
+import { assertLineReferences, attachLineReferences } from "../lib/businessReferences.js";
+import { d1Date } from "../lib/d1Date.js";
 import type { z } from "zod";
 import type { journalEntryInputSchema } from "../lib/zodSchemas.js";
 
@@ -37,7 +39,7 @@ export async function listJournalEntries(
   businessId: string,
   filters: { from?: Date; to?: Date; accountId?: string; keyword?: string }
 ) {
-  return prisma.journalEntry.findMany({
+  const entries = await prisma.journalEntry.findMany({
     where: {
       businessId,
       entryDate: {
@@ -51,12 +53,15 @@ export async function listJournalEntries(
     },
     include: {
       lines: {
-        include: { account: true, subAccount: true, partner: true, taxCategory: true },
+        include: { taxCategory: true },
         orderBy: { lineNumber: "asc" },
       },
     },
     orderBy: [{ entryDate: "desc" }, { entryNumber: "desc" }],
   });
+  const lines = await attachLineReferences(businessId, entries.flatMap(e => e.lines));
+  const byId = new Map(lines.map(l => [l.id, l]));
+  return entries.map(e => ({ ...e, lines: e.lines.map(l => byId.get(l.id)!) }));
 }
 
 export async function getJournalEntry(businessId: string, id: string) {
@@ -64,17 +69,18 @@ export async function getJournalEntry(businessId: string, id: string) {
     where: { id, businessId },
     include: {
       lines: {
-        include: { account: true, subAccount: true, partner: true, taxCategory: true },
+        include: { taxCategory: true },
         orderBy: { lineNumber: "asc" },
       },
     },
   });
   if (!entry) notFound("仕訳が見つかりません");
-  return entry;
+  return { ...entry, lines: await attachLineReferences(businessId, entry.lines) };
 }
 
 export async function createJournalEntry(businessId: string, input: JournalEntryInput) {
   assertBalanced(input.lines);
+  await assertLineReferences(businessId, input.lines);
   await assertAccountsBelongToBusiness(
     businessId,
     input.lines.map((l) => l.accountId)
@@ -124,7 +130,11 @@ export async function updateJournalEntry(
   const existing = await prisma.journalEntry.findFirst({ where: { id, businessId } });
   if (!existing) notFound("仕訳が見つかりません");
 
+  const settled = await requestDatabase().prepare('SELECT invoiceId FROM InvoicePaymentClaim WHERE businessId=? AND journalEntryId=?').bind(businessId,id).first();
+  if(settled) badRequest("入金消込の仕訳は直接変更できません。訂正仕訳で調整してください");
+
   assertBalanced(input.lines);
+  await assertLineReferences(businessId, input.lines);
   await assertAccountsBelongToBusiness(
     businessId,
     input.lines.map((l) => l.accountId)
@@ -132,37 +142,22 @@ export async function updateJournalEntry(
 
   const fiscalYear = await getOrCreateFiscalYearForDate(businessId, input.entryDate);
 
-  return prisma.$transaction(async (tx) => {
-    await tx.journalEntryLine.deleteMany({ where: { journalEntryId: id } });
-    return tx.journalEntry.update({
-      where: { id },
-      data: {
-        fiscalYearId: fiscalYear.id,
-        entryDate: input.entryDate,
-        description: input.description,
-        status: input.status ?? "CONFIRMED",
-        lines: {
-          create: input.lines.map((l, i) => ({
-            lineNumber: i + 1,
-            side: l.side,
-            accountId: l.accountId,
-            subAccountId: l.subAccountId || undefined,
-            partnerId: l.partnerId || undefined,
-            taxCategoryId: l.taxCategoryId || undefined,
-            amount: l.amount,
-            taxAmount: l.taxAmount ?? 0,
-            description: l.description,
-          })),
-        },
-      },
-      include: { lines: true },
-    });
-  });
+  const db = requestDatabase();
+  await db.batch([
+    db.prepare('DELETE FROM JournalEntryLine WHERE journalEntryId=?').bind(id),
+    db.prepare('UPDATE JournalEntry SET fiscalYearId=?,entryDate=?,description=?,status=?,updatedAt=? WHERE id=? AND businessId=?')
+      .bind(fiscalYear.id, d1Date(input.entryDate), input.description ?? null, input.status ?? "CONFIRMED", d1Date(new Date()), id, businessId),
+    ...input.lines.map((l, i) => db.prepare('INSERT INTO JournalEntryLine(id,journalEntryId,lineNumber,side,accountId,subAccountId,partnerId,taxCategoryId,amount,taxAmount,description) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(crypto.randomUUID(), id, i+1, l.side, l.accountId, l.subAccountId || null, l.partnerId || null, l.taxCategoryId || null, l.amount, l.taxAmount ?? 0, l.description ?? null)),
+  ]);
+  return getJournalEntry(businessId, id);
 }
 
 export async function deleteJournalEntry(businessId: string, id: string) {
   const existing = await prisma.journalEntry.findFirst({ where: { id, businessId } });
   if (!existing) notFound("仕訳が見つかりません");
+  const payment = await requestDatabase().prepare('SELECT invoiceId FROM InvoicePaymentClaim WHERE businessId=? AND journalEntryId=?').bind(businessId,id).first();
+  if(payment) badRequest("入金消込の仕訳は削除できません。訂正仕訳で調整してください");
   await prisma.journalEntry.delete({ where: { id } });
 }
 

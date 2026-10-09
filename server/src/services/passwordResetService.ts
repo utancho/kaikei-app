@@ -53,7 +53,7 @@ export async function requestPasswordReset(env: Bindings, email: string, context
   return { emailEnabled: isEmailEnabled(env) };
 }
 
-export async function resetPasswordWithToken(token: string, newPassword: string, context?: AuditContext) {
+export async function resetPasswordWithToken(db: D1Database, token: string, newPassword: string, context?: AuditContext) {
   if (newPassword.length < 8) badRequest("パスワードは8文字以上で入力してください");
 
   const tokenHash = await sha256Hex(token);
@@ -63,8 +63,13 @@ export async function resetPasswordWithToken(token: string, newPassword: string,
   }
 
   const passwordHash = await hashPassword(newPassword);
-  await prisma.user.update({ where: { id: record!.userId }, data: { passwordHash } });
-  await prisma.passwordResetToken.update({ where: { id: record!.id }, data: { usedAt: new Date() } });
+  const now = new Date().toISOString();
+  // D1 batch is atomic. Competing requests cannot both consume the same capability.
+  const results = await db.batch([
+    db.prepare('UPDATE User SET passwordHash=?, securityVersion=securityVersion+1 WHERE id=? AND EXISTS (SELECT 1 FROM PasswordResetToken WHERE tokenHash=? AND userId=User.id AND usedAt IS NULL AND julianday(expiresAt)>julianday(?))').bind(passwordHash, record!.userId, tokenHash, now),
+    db.prepare('UPDATE PasswordResetToken SET usedAt=? WHERE userId=? AND EXISTS (SELECT 1 FROM PasswordResetToken AS valid WHERE valid.tokenHash=? AND valid.usedAt IS NULL AND julianday(valid.expiresAt)>julianday(?))').bind(now, record!.userId, tokenHash, now),
+  ]);
+  if (results[0].meta.changes !== 1) badRequest("リンクは使用済みか、有効期限が切れています");
 
   const user = await prisma.user.findUnique({ where: { id: record!.userId }, select: { email: true } });
   await recordAudit({

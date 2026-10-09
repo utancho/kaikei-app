@@ -8,10 +8,17 @@ import { PrismaD1 } from "@prisma/adapter-d1";
 // という単純な形で使いたいので、AsyncLocalStorageでリクエストごとのPrismaClientを
 // 保持し、`prisma` はそれを都度参照するProxyとして公開する。
 const storage = new AsyncLocalStorage<PrismaClient>();
+const databaseStorage = new AsyncLocalStorage<D1Database>();
 
 export function runWithPrisma<T>(d1: D1Database, fn: () => Promise<T>): Promise<T> {
   const client = new PrismaClient({ adapter: new PrismaD1(d1) });
-  return storage.run(client, fn);
+  return databaseStorage.run(d1, () => storage.run(client, fn));
+}
+
+export function requestDatabase(): D1Database {
+  const db = databaseStorage.getStore();
+  if (!db) throw new Error("Database is unavailable outside request scope");
+  return db;
 }
 
 function currentClient(): PrismaClient {

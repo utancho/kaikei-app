@@ -120,7 +120,7 @@ function generateTempPassword(length = 12): string {
  * password 未指定時は一時パスワードを生成して返す。ユーザーには別経路で安全に伝え、
  * 次回ログイン後に本人がパスワード変更することを推奨する。
  */
-export async function adminResetUserPassword(targetUserId: string, password?: string, actingUserId?: string) {
+export async function adminResetUserPassword(db: D1Database, targetUserId: string, password?: string, actingUserId?: string) {
   const user = await prisma.user.findUnique({ where: { id: targetUserId } });
   if (!user) notFound("対象ユーザーが見つかりません");
 
@@ -128,7 +128,10 @@ export async function adminResetUserPassword(targetUserId: string, password?: st
   if (newPassword.length < 8) badRequest("パスワードは8文字以上で入力してください");
 
   const passwordHash = await hashPassword(newPassword);
-  await prisma.user.update({ where: { id: targetUserId }, data: { passwordHash } });
+  await db.batch([
+    db.prepare('UPDATE User SET passwordHash=?, securityVersion=securityVersion+1 WHERE id=?').bind(passwordHash, targetUserId),
+    db.prepare('UPDATE PasswordResetToken SET usedAt=? WHERE userId=? AND usedAt IS NULL').bind(new Date().toISOString(), targetUserId),
+  ]);
 
   await recordAudit({
     action: "PASSWORD_RESET",
@@ -146,7 +149,7 @@ export async function adminDisableTwoFactor(targetUserId: string, actingUserId?:
   if (!user) notFound("対象ユーザーが見つかりません");
   if (!user!.twoFactorEnabled) badRequest("このユーザーは二要素認証が有効ではありません");
 
-  await prisma.user.update({ where: { id: targetUserId }, data: { twoFactorEnabled: false, twoFactorSecret: null } });
+  await prisma.user.update({ where: { id: targetUserId }, data: { twoFactorEnabled: false, twoFactorSecret: null, securityVersion: { increment: 1 } } });
   await prisma.twoFactorBackupCode.deleteMany({ where: { userId: targetUserId } });
   await recordAudit({
     action: "TWO_FACTOR_DISABLED",

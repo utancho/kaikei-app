@@ -6,7 +6,8 @@ const APP_ORIGIN = new URL(APP_URL).origin;
 
 function isAppUrl(url) {
   try {
-    return new URL(url).origin === APP_ORIGIN;
+    const target = new URL(url);
+    return target.origin === APP_ORIGIN && !target.pathname.startsWith("/blog") && !target.pathname.startsWith("/legal");
   } catch {
     return false;
   }
@@ -18,7 +19,10 @@ function createWindow() {
     height: 840,
     minWidth: 960,
     minHeight: 600,
-    title: "Kaikei",
+    title: "keirio",
+    titleBarStyle: "hidden",
+    titleBarOverlay: { color: "#ffffff", symbolColor: "#27533d", height: 40 },
+    icon: path.join(__dirname, "build", "icon.png"),
     backgroundColor: "#f9fafb",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -29,7 +33,11 @@ function createWindow() {
   });
 
   win.setMenuBarVisibility(false);
-  win.loadURL(APP_URL);
+  const offline = () => win.loadFile(path.join(__dirname, "offline.html"));
+  win.webContents.on("did-fail-load", (_event, code, _description, url, isMainFrame) => {
+    if (isMainFrame && code !== -3 && isAppUrl(url)) offline();
+  });
+  win.loadURL(APP_URL + "/app").catch(() => { /* did-fail-load renders the local recovery screen */ });
 
   // 外部リンク(Stripeなど)はOSのデフォルトブラウザで開く。
   win.webContents.setWindowOpenHandler(({ url }) => {

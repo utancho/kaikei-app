@@ -1,6 +1,7 @@
+import { KeirioIcon } from "../components/KeirioIcon";
 import { useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { Wallet, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { Card } from "../components/ui/Card";
 import { Button } from "../components/ui/Button";
@@ -43,10 +44,8 @@ export default function ResetPassword() {
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
       <div className="w-full max-w-sm">
         <Link to="/" className="flex items-center gap-2 justify-center mb-6">
-          <div className="w-9 h-9 rounded-lg bg-brand-600 flex items-center justify-center">
-            <Wallet size={20} className="text-white" />
-          </div>
-          <div className="text-xl font-bold text-gray-900">Kaikei</div>
+          <KeirioIcon size={36} />
+          <div className="text-xl font-bold text-gray-900">keirio</div>
         </Link>
 
         <Card className="p-8">

@@ -1,5 +1,7 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
+import { bodyLimit } from "hono/body-limit";
+import { browserOriginGuard, securityHeaders } from "./middleware/security.js";
 import { runWithPrisma } from "./lib/prisma.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireActiveSubscription, requireAdmin, requireAuth, verifyBusinessAccess } from "./middleware/auth.js";
@@ -17,9 +19,16 @@ import { fixedAssetsRouter } from "./routes/fixedAssets.js";
 import { templatesRouter } from "./routes/templates.js";
 import { budgetsRouter } from "./routes/budgets.js";
 import { receiptsRouter } from "./routes/receipts.js";
+import { blogRouter } from "./routes/blog.js";
+import { publicSeo } from "./routes/publicSeo.js";
+import { workflowRouter, recordBusinessOperation } from "./routes/workflows.js";
+import { accountSecurityRouter } from "./routes/accountSecurity.js";
 import type { AppEnv } from "./types/env.js";
 
 const app = new Hono<AppEnv>();
+app.use("*", securityHeaders);
+app.use("/api/*", browserOriginGuard);
+app.use("/api/*", bodyLimit({ maxSize: 10 * 1024 * 1024, onError: c => c.json({ error: "送信データが大きすぎます" }, 413) }));
 
 // 各リクエストの間だけ有効なPrismaClientをAsyncLocalStorageに載せる。
 // (services/*.ts からの `prisma.xxx` はこのスコープ内でのみ動く)
@@ -39,14 +48,19 @@ app.onError(errorHandler);
 
 app.get("/api/health", (c) => c.json({ status: "ok" }));
 
+// ブログはログイン前にも閲覧できる公開API。
+app.route("/api/blog", blogRouter);
+
 app.route("/api/auth", authRouter);
+app.route("/api/account-security", accountSecurityRouter);
+app.route("/api/workflows", workflowRouter);
 // StripeのWebhookは署名検証のため生ボディが必要かつCookie認証も不要なので、
 // requireAuthより前・別ルートとしてマウントする。
 app.route("/api/billing/webhook", webhookRouter);
 app.use("/api/billing/*", requireAuth);
 app.route("/api/billing", billingRouter);
 
-const businessScoped = [requireAuth, verifyBusinessAccess, requireActiveSubscription] as const;
+const businessScoped = [requireAuth, verifyBusinessAccess, requireActiveSubscription, recordBusinessOperation] as const;
 
 app.use("/api/businesses/*", requireAuth);
 app.route("/api/businesses", businessRouter);
@@ -86,5 +100,6 @@ app.route("/api/receipts", receiptsRouter);
 
 app.use("/api/admin/*", requireAuth, requireAdmin);
 app.route("/api/admin", adminRouter);
+app.route("/", publicSeo);
 
 export default app;

@@ -9,15 +9,19 @@
   "scripts": {
     "dev:server": "wrangler dev",
     "dev:client": "npm run dev --workspace=client",
-    "build:server": "npm run build --workspace=server",
-    "build:client": "npm run build --workspace=client",
+    "build:server": "node scripts/prerender-public-pages.mjs && npm run build --workspace=server",
+    "build:client": "node scripts/sync-brand-icon.mjs && npm run build --workspace=client",
     "build": "npm run build:client && npm run build:server",
-    "deploy": "npm run build:client && npm run prisma:generate --workspace=server && wrangler deploy",
+    "deploy": "npm run build && npm run prisma:generate --workspace=server && wrangler deploy",
     "d1:migrations:apply:local": "wrangler d1 migrations apply kaikei-db --local",
     "d1:migrations:apply:remote": "wrangler d1 migrations apply kaikei-db --remote",
     "prisma:seed": "npm run prisma:seed --workspace=server"
   },
+  "overrides": {
+    "deepmerge-ts": "8.0.0"
+  },
   "devDependencies": {
-    "wrangler": "^4.123.0"
+    "esbuild": "0.28.2",
+    "wrangler": "^4.149.0"
   }
 }

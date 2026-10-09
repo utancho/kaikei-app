@@ -1,0 +1,7 @@
+CREATE TABLE IF NOT EXISTS WorkflowBudget(name TEXT PRIMARY KEY,bytes INTEGER NOT NULL,rows INTEGER NOT NULL);
+INSERT OR IGNORE INTO WorkflowBudget(name,bytes,rows) SELECT 'history',coalesce(sum(coalesce(length(beforeJson),0)+coalesce(length(afterJson),0)+300),0),count(*) FROM BusinessHistory;
+CREATE TRIGGER IF NOT EXISTS history_quota BEFORE INSERT ON BusinessHistory WHEN (SELECT bytes+coalesce(length(NEW.beforeJson),0)+coalesce(length(NEW.afterJson),0)+300>52428800 OR rows>=50000 FROM WorkflowBudget WHERE name='history') BEGIN SELECT RAISE(ABORT,'WORKFLOW_QUOTA'); END;
+CREATE TRIGGER IF NOT EXISTS history_budget AFTER INSERT ON BusinessHistory BEGIN UPDATE WorkflowBudget SET bytes=bytes+coalesce(length(NEW.beforeJson),0)+coalesce(length(NEW.afterJson),0)+300,rows=rows+1 WHERE name='history'; END;
+CREATE TRIGGER IF NOT EXISTS evidence_count_quota BEFORE INSERT ON BusinessEvidence WHEN (SELECT count(*) FROM BusinessEvidence WHERE businessId=NEW.businessId)>=100 OR (SELECT count(*) FROM BusinessEvidence)>=1000 BEGIN SELECT RAISE(ABORT,'EVIDENCE_QUOTA'); END;
+CREATE TRIGGER IF NOT EXISTS recurring_quota BEFORE INSERT ON BusinessRecurring WHEN (SELECT count(*) FROM BusinessRecurring WHERE businessId=NEW.businessId AND enabled=1)>=20 BEGIN SELECT RAISE(ABORT,'WORKFLOW_QUOTA'); END;
+CREATE UNIQUE INDEX IF NOT EXISTS One_sample_per_business ON JournalEntry(businessId) WHERE description='【サンプル】現金売上（実取引ではありません）';

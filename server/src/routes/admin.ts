@@ -11,6 +11,7 @@ import {
   updateUserSubscription,
 } from "../services/adminService.js";
 import { listAuditLogs } from "../services/auditService.js";
+import { createBlogPost, deleteBlogPost, listAllBlogPosts, updateBlogPost } from "../services/blogService.js";
 import type { AppEnv } from "../types/env.js";
 
 export const adminRouter = new Hono<AppEnv>();
@@ -61,11 +62,45 @@ const resetPasswordSchema = z.object({
 
 adminRouter.post("/users/:id/reset-password", async (c) => {
   const { password } = resetPasswordSchema.parse(await c.req.json().catch(() => ({})));
-  const result = await adminResetUserPassword(c.req.param("id"), password, c.get("userId"));
+  const result = await adminResetUserPassword(c.env.DB, c.req.param("id"), password, c.get("userId"));
   return c.json(result);
 });
 
 adminRouter.post("/users/:id/disable-2fa", async (c) => {
   const result = await adminDisableTwoFactor(c.req.param("id"), c.get("userId"));
   return c.json(result);
+});
+
+const blogPostInputSchema = z.object({
+  title: z.string().trim().min(1, "タイトルを入力してください").max(120),
+  slug: z
+    .string()
+    .trim()
+    .min(1, "URLスラッグを入力してください")
+    .max(100)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "URLスラッグは半角英小文字・数字・ハイフンで入力してください"),
+  excerpt: z.string().max(240).nullable().optional(),
+  content: z.string().trim().min(1, "本文を入力してください").max(100000),
+  coverImageUrl: z.string().url("画像URLの形式が正しくありません").max(2048).nullable().optional(),
+  category: z.string().max(50).nullable().optional(),
+  published: z.boolean(),
+});
+
+adminRouter.get("/blog", async (c) => {
+  return c.json(await listAllBlogPosts());
+});
+
+adminRouter.post("/blog", async (c) => {
+  const input = blogPostInputSchema.parse(await c.req.json());
+  return c.json(await createBlogPost(input), 201);
+});
+
+adminRouter.put("/blog/:id", async (c) => {
+  const input = blogPostInputSchema.parse(await c.req.json());
+  return c.json(await updateBlogPost(c.req.param("id"), input));
+});
+
+adminRouter.delete("/blog/:id", async (c) => {
+  await deleteBlogPost(c.req.param("id"));
+  return c.body(null, 204);
 });

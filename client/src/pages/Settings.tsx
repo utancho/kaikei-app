@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Plus, Building2, CreditCard, Users, Trash2, Mail } from "lucide-react";
 import { useBusiness } from "../context/BusinessContext";
 import { useAuth } from "../context/AuthContext";
@@ -23,27 +23,34 @@ const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
 
 export default function Settings() {
   const { currentBusiness, businesses, refresh, setCurrentBusinessId } = useBusiness();
-  const { user, subscription } = useAuth();
+  const { user, subscription, isSubscriptionActive } = useAuth();
   const toast = useToast();
   const confirm = useConfirm();
   const [portalLoading, setPortalLoading] = useState(false);
 
   const [members, setMembers] = useState<BusinessMembersResponse | null>(null);
   const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteRole, setInviteRole] = useState<"VIEWER" | "MEMBER">("VIEWER");
+  const [inviteLink, setInviteLink] = useState("");
   const [inviting, setInviting] = useState(false);
+  const currentId=useRef(currentBusiness?.id);
+  currentId.current=currentBusiness?.id;
 
   const loadMembers = () => {
     if (!currentBusiness) return;
-    api.listMembers(currentBusiness.id).then(setMembers);
+    const id=currentBusiness.id;
+    api.listMembers(id).then(data=>{if(currentId.current===id)setMembers(data);}).catch(e => {if(currentId.current===id)toast.error(e instanceof ApiError ? e.message : "共有メンバーを読み込めませんでした");});
   };
 
-  useEffect(loadMembers, [currentBusiness]);
+  useEffect(()=>{setMembers(null);setInviteLink("");setInviteEmail("");loadMembers();}, [currentBusiness]);
 
   const handleInvite = async () => {
     if (!currentBusiness || !inviteEmail) return;
     setInviting(true);
     try {
-      await api.inviteMember(currentBusiness.id, inviteEmail);
+      const invitation = await api.inviteMember(currentBusiness.id, inviteEmail, inviteRole);
+      if(currentId.current!==currentBusiness.id){toast.success("招待元の事業者へ戻って、リンクを再発行してください");return;}
+      setInviteLink(invitation.inviteToken ? "https://keirio-hub.com/invite#token=" + invitation.inviteToken : "");
       toast.success(`${inviteEmail} を招待しました`);
       setInviteEmail("");
       loadMembers();
@@ -157,16 +164,16 @@ export default function Settings() {
         </div>
         <div className="text-sm text-gray-600">{user?.email}</div>
         <div className="text-sm text-gray-500">
-          プラン状況: <span className="font-medium text-gray-800">{SUBSCRIPTION_STATUS_LABELS[subscription?.status ?? "NONE"]}</span>
+          プラン状況: <span className="font-medium text-gray-800">{!isSubscriptionActive && currentBusiness?.isOwner === false ? "共有元のプランで利用中（個別契約不要）" : SUBSCRIPTION_STATUS_LABELS[subscription?.status ?? "NONE"]}</span>
         </div>
-        <Button variant="secondary" size="sm" loading={portalLoading} onClick={handleOpenPortal}>
+        {isSubscriptionActive && <Button variant="secondary" size="sm" loading={portalLoading} onClick={handleOpenPortal}>
           お支払い方法・プランを管理
-        </Button>
+        </Button>}
       </Card>
 
       <TwoFactorSettings />
 
-      {currentBusiness && (
+      {currentBusiness?.isOwner && (
         <Card className="p-5 space-y-4">
           <div className="flex items-center gap-2 mb-1">
             <Building2 size={16} className="text-gray-400" />
@@ -237,11 +244,11 @@ export default function Settings() {
         <Card className="p-5 space-y-3">
           <div className="flex items-center gap-2 mb-1">
             <Users size={16} className="text-gray-400" />
-            <h2 className="font-semibold text-sm text-gray-800">メンバー</h2>
+            <h2 className="font-semibold text-sm text-gray-800">税理士・メンバーとの共有</h2>
           </div>
 
           <div className="divide-y divide-gray-100">
-            <div className="flex items-center justify-between py-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div className="text-sm text-gray-700">
                 {members.owner?.email}
                 <span className="text-xs text-gray-400 ml-1">{members.owner?.name}</span>
@@ -250,8 +257,9 @@ export default function Settings() {
             </div>
             {members.members.map((m) => (
               <div key={m.id} className="flex items-center justify-between py-2">
-                <div className="text-sm text-gray-700">{m.email}</div>
+                <div className="min-w-0 break-all text-sm text-gray-700">{m.email}</div>
                 <div className="flex items-center gap-2">
+                  <Badge tone="gray">{m.role === "VIEWER" ? "閲覧専用" : "編集可"}</Badge>
                   <Badge tone={m.status === "ACTIVE" ? "green" : "yellow"}>{m.status === "ACTIVE" ? "参加済み" : "招待中"}</Badge>
                   {currentBusiness.isOwner && (
                     <button className="text-gray-400 hover:text-red-600" onClick={() => handleRemoveMember(m.id, m.email)}>
@@ -265,24 +273,28 @@ export default function Settings() {
           </div>
 
           {currentBusiness.isOwner && (
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex flex-wrap items-center gap-2 pt-2">
               <div className="relative flex-1">
                 <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                 <input
                   className={`${inputClass} pl-8 w-full`}
                   placeholder="招待するメールアドレス"
+                  aria-label="共有する税理士・メンバーのメールアドレス"
                   value={inviteEmail}
                   onChange={(e) => setInviteEmail(e.target.value)}
                 />
               </div>
+              <select aria-label="共有権限" value={inviteRole} onChange={e=>setInviteRole(e.target.value as "VIEWER" | "MEMBER")} className={selectClass}><option value="VIEWER">閲覧専用（推奨）</option><option value="MEMBER">編集可</option></select>
               <Button size="sm" loading={inviting} onClick={handleInvite} disabled={!inviteEmail}>
                 招待
               </Button>
             </div>
           )}
           <p className="text-xs text-gray-400">
-            招待されたメンバーはオーナーの契約プランで、この事業者の記帳・請求書・レポート機能を利用できます(事業者設定の変更・メンバー管理はオーナーのみ)。
+            閲覧専用は記帳・請求書・レポートの確認に利用できます。編集を任せる場合のみ「編集可」を選んでください。共有元の契約が有効なら、共有先の個別契約は不要です。
           </p>
+          {inviteLink && <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3"><label className="text-xs text-emerald-900">招待リンク（7日間有効）<input readOnly value={inviteLink} className="mt-2 w-full rounded border bg-white p-2 text-xs" onFocus={e=>e.target.select()} /></label><button type="button" className="mt-2 min-h-11 text-sm text-emerald-800" onClick={()=>navigator.clipboard.writeText(inviteLink).then(()=>toast.success("招待リンクをコピーしました")).catch(()=>toast.error("リンクを選択してコピーしてください"))}>リンクをコピー</button></div>}
+          <p className="text-xs leading-6 text-gray-500">招待メールは自動送信されません。表示されたリンクを共有先に伝え、招待したメールアドレスで登録・ログインして承認してもらってください。招待中の同じアドレスを再招待すると、以前のリンクは無効になります。</p>
         </Card>
       )}
 

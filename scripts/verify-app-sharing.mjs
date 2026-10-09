@@ -1,0 +1,48 @@
+import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
+const BASE="http://127.0.0.1:4000";
+const PASSWORD="qa-local-only-password";
+async function account(email) {
+  let response=await fetch(BASE+"/api/auth/signup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:PASSWORD,name:"Local QA"})});
+  if(response.status!==201 && response.status!==200) response=await fetch(BASE+"/api/auth/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email,password:PASSWORD})});
+  assert.ok(response.ok,"local signup/login");
+  const cookie=response.headers.get("set-cookie").split(";")[0];
+  return async (path,method="GET",data)=>{
+    const res=await fetch(BASE+path,{method,headers:{Cookie:cookie,...(data?{"Content-Type":"application/json"}:{})},body:data?JSON.stringify(data):undefined});
+    return {status:res.status,data:res.status===204?null:await res.json()};
+  };
+}
+const owner=await account("owner.qa@example.invalid");
+const viewer=await account("viewer.qa@example.invalid");
+const other=await account("other.qa@example.invalid");
+const seed=spawnSync(process.execPath,["node_modules/wrangler/bin/wrangler.js","d1","execute","kaikei-db","--local","--persist-to",".qa-app-db","--command","UPDATE Subscription SET status='ACTIVE' WHERE userId IN (SELECT id FROM User WHERE email='owner.qa@example.invalid');"],{cwd:process.cwd(),encoding:"utf8"});
+assert.equal(seed.status,0,"activate local synthetic owner's plan");
+const business=await owner("/api/businesses","POST",{name:"QA Sharing",type:"INDIVIDUAL",taxationType:"EXEMPT"});
+assert.equal(business.status,201);
+const id=business.data.id;
+const invitation=await owner("/api/businesses/"+id+"/members","POST",{email:"viewer.qa@example.invalid",role:"VIEWER"});
+assert.equal(invitation.status,201);
+assert.match(invitation.data.inviteToken,/^[a-f0-9]{64}$/);
+assert.equal((await viewer("/api/businesses")).data.some(b=>b.id===id),false,"email alone does not grant membership");
+assert.equal((await other("/api/businesses/invitations/accept","POST",{token:invitation.data.inviteToken})).status,400,"wrong recipient denied");
+assert.equal((await viewer("/api/businesses/invitations/accept","POST",{token:invitation.data.inviteToken})).status,200);
+assert.equal((await viewer("/api/businesses/invitations/accept","POST",{token:invitation.data.inviteToken})).status,400,"token single use");
+const visible=(await viewer("/api/businesses")).data.find(b=>b.id===id);
+assert.equal(visible.accessRole,"VIEWER");
+assert.equal(visible.planActive,true,"shared owner plan is available to uncontracted viewer");
+assert.equal((await viewer("/api/reports/trial-balance?businessId="+id)).status,200);
+assert.equal((await viewer("/api/journal-entries?businessId="+id,"POST",{})).status,403);
+assert.equal((await viewer("/api/partners?businessId="+id,"POST",{})).status,403);
+assert.equal((await viewer("/api/businesses/"+id,"PATCH",{name:"Not allowed"})).status,404);
+assert.equal((await owner("/api/partners?businessId="+id,"POST",{})).status,400,"validation error remains 400, not misleading 401");
+assert.equal((await owner("/api/businesses/"+id+"/members/"+invitation.data.id,"DELETE")).status,204);
+assert.equal((await viewer("/api/reports/trial-balance?businessId="+id)).status,403,"revocation takes effect");
+const editInvite=await owner("/api/businesses/"+id+"/members","POST",{email:"other.qa@example.invalid",role:"MEMBER"});
+assert.equal((await other("/api/businesses/invitations/accept","POST",{token:editInvite.data.inviteToken})).status,200);
+const written=await other("/api/partners?businessId="+id,"POST",{name:"QA supplier",type:"VENDOR"});
+assert.equal(written.status,201,"editor retains write access: "+JSON.stringify(written.data));
+const expired=await owner("/api/businesses/"+id+"/members","POST",{email:"viewer.qa@example.invalid",role:"VIEWER"});
+const expire=spawnSync(process.execPath,["node_modules/wrangler/bin/wrangler.js","d1","execute","kaikei-db","--local","--persist-to",".qa-app-db","--command","UPDATE BusinessMember SET inviteExpiresAt=0 WHERE id='"+expired.data.id+"';"],{cwd:process.cwd(),encoding:"utf8"});
+assert.equal(expire.status,0);
+assert.equal((await viewer("/api/businesses/invitations/accept","POST",{token:expired.data.inviteToken})).status,400,"expired link denied");
+console.log("PASS: local login, secret invitation, recipient check, single-use link, shared plan, read-only API enforcement, error codes, revocation");

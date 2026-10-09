@@ -9,7 +9,7 @@ import { Badge } from "./ui/Badge";
 import { useToast } from "./ui/Toast";
 import { inputClass, labelClass } from "../lib/formStyles";
 
-type Mode = "idle" | "enrolling" | "disabling";
+type Mode = "idle" | "enrolling" | "disabling" | "regenerating" | "confirming";
 
 export function TwoFactorSettings() {
   const { user, refresh } = useAuth();
@@ -38,8 +38,9 @@ export function TwoFactorSettings() {
   const regenerate = async () => {
     setLoading(true);
     try {
-      const res = await api.twoFactorRegenerateBackupCodes();
+      const res = await api.twoFactorRegenerateBackupCodes(password, code);
       setBackupCodes(res.backupCodes);
+      setMode("idle"); setPassword(""); setCode("");
       toast.success("バックアップコードを再生成しました");
       await refresh();
     } catch (e) {
@@ -52,7 +53,7 @@ export function TwoFactorSettings() {
   const startEnroll = async () => {
     setLoading(true);
     try {
-      const { secret: s, otpauthUrl } = await api.twoFactorSetup();
+      const { secret: s, otpauthUrl } = await api.twoFactorSetup(password);
       setSecret(s);
       setQrDataUrl(await QRCode.toDataURL(otpauthUrl, { margin: 1, width: 180 }));
       setMode("enrolling");
@@ -67,10 +68,11 @@ export function TwoFactorSettings() {
   const confirmEnable = async () => {
     setLoading(true);
     try {
-      const res = await api.twoFactorEnable(code);
+      const res = await api.twoFactorEnable(code, password);
       setBackupCodes(res.backupCodes);
       toast.success("二要素認証を有効にしました");
       setMode("idle");
+      setPassword(""); setCode(""); setSecret(""); setQrDataUrl(null);
       await refresh();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "有効化に失敗しました");
@@ -82,10 +84,11 @@ export function TwoFactorSettings() {
   const confirmDisable = async () => {
     setLoading(true);
     try {
-      await api.twoFactorDisable(password);
+      await api.twoFactorDisable(password, code);
       toast.success("二要素認証を無効にしました");
       setMode("idle");
       setPassword("");
+      setCode(""); setBackupCodes(null);
       await refresh();
     } catch (e) {
       toast.error(e instanceof ApiError ? e.message : "無効化に失敗しました");
@@ -133,22 +136,28 @@ export function TwoFactorSettings() {
       )}
 
       {enabled ? (
-        mode === "disabling" ? (
+        mode === "disabling" || mode === "regenerating" ? (
           <div className="space-y-3 max-w-sm">
             <div>
-              <label className={labelClass}>確認のため現在のパスワードを入力</label>
+              <label htmlFor="twofactor-password" className={labelClass}>確認のため現在のパスワードを入力</label>
               <input
+                id="twofactor-password"
+                autoComplete="current-password"
                 type="password"
                 className={`${inputClass} w-full`}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
+            <div>
+              <label htmlFor="twofactor-proof" className={labelClass}>認証コードまたはバックアップコード</label>
+              <input id="twofactor-proof" autoComplete="one-time-code" className={`${inputClass} w-full`} value={code} onChange={e => setCode(e.target.value)} maxLength={32} />
+            </div>
             <div className="flex gap-2">
-              <Button variant="danger" loading={loading} disabled={!password} onClick={confirmDisable}>
-                無効にする
+              <Button variant={mode === "disabling" ? "danger" : "primary"} loading={loading} disabled={!password || !code} onClick={mode === "disabling" ? confirmDisable : regenerate}>
+                {mode === "disabling" ? "無効にする" : "再生成する"}
               </Button>
-              <Button variant="secondary" onClick={() => { setMode("idle"); setPassword(""); }}>
+              <Button variant="secondary" onClick={() => { setMode("idle"); setPassword(""); setCode(""); }}>
                 キャンセル
               </Button>
             </div>
@@ -160,10 +169,10 @@ export function TwoFactorSettings() {
               認証アプリによる二要素認証が有効です。
               <span className="text-gray-400">(残りバックアップコード: {remaining}個)</span>
             </span>
-            <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} loading={loading} onClick={regenerate}>
+            <Button variant="secondary" size="sm" icon={<RefreshCw size={14} />} loading={loading} onClick={() => { setMode("regenerating"); setPassword(""); setCode(""); }}>
               コード再生成
             </Button>
-            <Button variant="secondary" size="sm" onClick={() => setMode("disabling")}>
+            <Button variant="secondary" size="sm" onClick={() => { setMode("disabling"); setPassword(""); setCode(""); }}>
               無効化
             </Button>
           </div>
@@ -184,8 +193,10 @@ export function TwoFactorSettings() {
                 </code>
               </div>
               <div>
-                <label className={labelClass}>認証コード(6桁)</label>
+                <label htmlFor="twofactor-enroll-code" className={labelClass}>認証コード(6桁)</label>
                 <input
+                  id="twofactor-enroll-code"
+                  autoComplete="one-time-code"
                   type="text"
                   inputMode="numeric"
                   maxLength={6}
@@ -199,18 +210,27 @@ export function TwoFactorSettings() {
                 <Button loading={loading} disabled={code.length !== 6} onClick={confirmEnable}>
                   有効にする
                 </Button>
-                <Button variant="secondary" onClick={() => setMode("idle")}>
+                <Button variant="secondary" onClick={() => { setMode("idle"); setPassword(""); setCode(""); setSecret(""); setQrDataUrl(null); }}>
                   キャンセル
                 </Button>
               </div>
             </div>
           </div>
         </div>
+      ) : mode === "confirming" ? (
+        <div className="space-y-3 max-w-sm">
+          <label htmlFor="twofactor-password" className={labelClass}>現在のパスワードで本人確認</label>
+          <input id="twofactor-password" type="password" autoComplete="current-password" className={`${inputClass} w-full`} value={password} onChange={e => setPassword(e.target.value)} />
+          <div className="flex gap-2">
+            <Button loading={loading} disabled={!password} onClick={startEnroll}>設定を開始する</Button>
+            <Button variant="secondary" onClick={() => { setMode("idle"); setPassword(""); }}>キャンセル</Button>
+          </div>
+        </div>
       ) : (
         <div className="flex items-center gap-3 text-sm text-gray-600">
           <ShieldAlert size={20} className="text-amber-500" />
           <span className="flex-1">二要素認証は無効です。有効にするとアカウントの安全性が高まります。</span>
-          <Button size="sm" icon={<Smartphone size={14} />} loading={loading} onClick={startEnroll}>
+          <Button size="sm" icon={<Smartphone size={14} />} loading={loading} onClick={() => setMode("confirming")}>
             有効化する
           </Button>
         </div>

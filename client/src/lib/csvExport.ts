@@ -1,6 +1,8 @@
-function escapeCsvCell(value: unknown): string {
-  const s = value === null || value === undefined ? "" : String(value);
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+export function escapeCsvCell(value: unknown): string {
+  let s = value === null || value === undefined ? "" : String(value);
+  // CSV quotes do not prevent formula evaluation. Keep actual numeric cells numeric.
+  if (typeof value !== "number" && /^[\s\u0000-\u001f\u007f]*[=+\-@]/u.test(s)) s = "'" + s;
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
   return s;
 }
 

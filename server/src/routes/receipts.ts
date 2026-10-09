@@ -10,6 +10,7 @@ const MAX_FILE_SIZE = 8 * 1024 * 1024;
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
 receiptsRouter.post("/analyze", async (c) => {
+  if(c.env.FREE_TIER_MODE==='true') return c.json({error:"追加課金を避けるため、外部AI読取は停止しています。実務管理で原本を保存し、過去の仕訳候補または手入力をご利用ください",code:"FREE_TIER_AI_DISABLED"},503);
   const businessId = requireBusinessId(c);
   const body = await c.req.parseBody();
   const file = body.file;

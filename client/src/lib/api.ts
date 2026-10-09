@@ -35,6 +35,9 @@ import type {
   SubscriptionStatus,
   TaxCategory,
   TrialBalanceRow,
+  BlogPost,
+  BlogPostInput,
+  BlogPostSummary,
 } from "./types";
 
 // ローカル開発ではVite Proxy経由の相対パス "/api" を使う(vite.config.tsのproxy参照)。
@@ -79,6 +82,11 @@ function qs(params: Record<string, string | undefined>): string {
 }
 
 export const api = {
+  // Public blog
+  listBlogPosts: (filters: { query?: string; category?: string } = {}) =>
+    request<BlogPostSummary[]>(`/blog${qs(filters)}`),
+  getBlogPost: (slug: string) => request<BlogPost>(`/blog/${encodeURIComponent(slug)}`),
+
   // Auth
   signup: (email: string, password: string, name?: string) =>
     request<{ user: { id: string; email: string; name: string | null; role: string } }>("/auth/signup", {
@@ -94,13 +102,13 @@ export const api = {
       }
     ),
   logout: () => request<void>("/auth/logout", { method: "POST" }),
-  twoFactorSetup: () => request<{ secret: string; otpauthUrl: string }>("/auth/2fa/setup", { method: "POST" }),
-  twoFactorEnable: (code: string) =>
-    request<{ enabled: boolean; backupCodes: string[] }>("/auth/2fa/enable", { method: "POST", body: JSON.stringify({ code }) }),
-  twoFactorRegenerateBackupCodes: () =>
-    request<{ backupCodes: string[] }>("/auth/2fa/backup-codes", { method: "POST" }),
-  twoFactorDisable: (password: string) =>
-    request<{ enabled: boolean }>("/auth/2fa/disable", { method: "POST", body: JSON.stringify({ password }) }),
+  twoFactorSetup: (password: string) => request<{ secret: string; otpauthUrl: string }>("/auth/2fa/setup", { method: "POST", body: JSON.stringify({ password }) }),
+  twoFactorEnable: (code: string, password: string) =>
+    request<{ enabled: boolean; backupCodes: string[] }>("/auth/2fa/enable", { method: "POST", body: JSON.stringify({ code, password }) }),
+  twoFactorRegenerateBackupCodes: (password: string, code: string) =>
+    request<{ backupCodes: string[] }>("/auth/2fa/backup-codes", { method: "POST", body: JSON.stringify({ password, code }) }),
+  twoFactorDisable: (password: string, code: string) =>
+    request<{ enabled: boolean }>("/auth/2fa/disable", { method: "POST", body: JSON.stringify({ password, code }) }),
   forgotPassword: (email: string) =>
     request<{ ok: boolean; emailEnabled: boolean }>("/auth/forgot-password", {
       method: "POST",
@@ -137,9 +145,10 @@ export const api = {
     request<Business>(`/businesses/${id}`, { method: "PATCH", body: JSON.stringify(data) }),
   listFiscalYears: (businessId: string) =>
     request<FiscalYear[]>(`/businesses/${businessId}/fiscal-years`),
+  acceptInvite: (token: string) => request<{ businessId: string }>("/businesses/invitations/accept", { method: "POST", body: JSON.stringify({ token }) }),
   listMembers: (businessId: string) => request<BusinessMembersResponse>(`/businesses/${businessId}/members`),
-  inviteMember: (businessId: string, email: string) =>
-    request<BusinessMemberInfo>(`/businesses/${businessId}/members`, { method: "POST", body: JSON.stringify({ email }) }),
+  inviteMember: (businessId: string, email: string, role: "MEMBER" | "VIEWER" = "MEMBER") =>
+    request<BusinessMemberInfo>(`/businesses/${businessId}/members`, { method: "POST", body: JSON.stringify({ email, role }) }),
   removeMember: (businessId: string, memberId: string) =>
     request<void>(`/businesses/${businessId}/members/${memberId}`, { method: "DELETE" }),
 
@@ -324,6 +333,12 @@ export const api = {
   adminListAuditLogs: (limit = 100) => request<AuditLog[]>(`/admin/audit-logs${qs({ limit: String(limit) })}`),
   adminDisableTwoFactor: (userId: string) =>
     request<{ email: string; enabled: boolean }>(`/admin/users/${userId}/disable-2fa`, { method: "POST" }),
+  adminListBlogPosts: () => request<BlogPost[]>("/admin/blog"),
+  adminCreateBlogPost: (data: BlogPostInput) =>
+    request<BlogPost>("/admin/blog", { method: "POST", body: JSON.stringify(data) }),
+  adminUpdateBlogPost: (id: string, data: BlogPostInput) =>
+    request<BlogPost>(`/admin/blog/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+  adminDeleteBlogPost: (id: string) => request<void>(`/admin/blog/${id}`, { method: "DELETE" }),
 };
 
 export { ApiError };

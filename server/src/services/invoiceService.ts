@@ -1,5 +1,7 @@
-import { prisma } from "../lib/prisma.js";
+import { prisma, requestDatabase } from "../lib/prisma.js";
 import { notFound, badRequest } from "../lib/httpError.js";
+import { assertPartnerBelongs } from "../lib/businessReferences.js";
+import { d1Date } from "../lib/d1Date.js";
 import type { z } from "zod";
 import type { invoiceInputSchema } from "../lib/zodSchemas.js";
 import { getOrCreateFiscalYearForDate } from "./fiscalYearService.js";
@@ -46,7 +48,7 @@ async function computeInvoiceTotals(items: InvoiceInput["items"]): Promise<Compu
 
 export async function listInvoices(businessId: string) {
   return prisma.invoice.findMany({
-    where: { businessId },
+    where: { businessId, partner: { businessId } },
     include: { partner: true, items: true },
     orderBy: { issueDate: "desc" },
   });
@@ -54,7 +56,7 @@ export async function listInvoices(businessId: string) {
 
 export async function getInvoice(businessId: string, id: string) {
   const invoice = await prisma.invoice.findFirst({
-    where: { id, businessId },
+    where: { id, businessId, partner: { businessId } },
     include: { partner: true, items: { include: { taxCategory: true } } },
   });
   if (!invoice) notFound("請求書が見つかりません");
@@ -86,30 +88,23 @@ export async function createInvoice(businessId: string, input: InvoiceInput) {
 }
 
 export async function updateInvoice(businessId: string, id: string, input: InvoiceInput) {
+  await assertPartnerBelongs(businessId, input.partnerId);
   const existing = await prisma.invoice.findFirst({ where: { id, businessId } });
   if (!existing) notFound("請求書が見つかりません");
+  const settled=await requestDatabase().prepare('SELECT invoiceId FROM InvoicePaymentClaim WHERE businessId=? AND invoiceId=?').bind(businessId,id).first();
+  if(settled) badRequest("入金消込済みの請求書は直接変更できません。訂正は別の取引として記録してください");
 
   const totals = await computeInvoiceTotals(input.items);
 
-  return prisma.$transaction(async (tx) => {
-    await tx.invoiceItem.deleteMany({ where: { invoiceId: id } });
-    return tx.invoice.update({
-      where: { id },
-      data: {
-        partnerId: input.partnerId,
-        invoiceNumber: input.invoiceNumber,
-        issueDate: input.issueDate,
-        dueDate: input.dueDate,
-        status: input.status ?? existing.status,
-        notes: input.notes,
-        subtotal: totals.subtotal,
-        taxAmount: totals.taxAmount,
-        total: totals.total,
-        items: { create: totals.items },
-      },
-      include: { items: true, partner: true },
-    });
-  });
+  const db = requestDatabase();
+  await db.batch([
+    db.prepare('DELETE FROM InvoiceItem WHERE invoiceId=?').bind(id),
+    db.prepare('UPDATE Invoice SET partnerId=?,invoiceNumber=?,issueDate=?,dueDate=?,status=?,notes=?,subtotal=?,taxAmount=?,total=? WHERE id=? AND businessId=?')
+      .bind(input.partnerId, input.invoiceNumber, d1Date(input.issueDate), input.dueDate ? d1Date(input.dueDate) : null, input.status ?? existing.status, input.notes ?? null, totals.subtotal, totals.taxAmount, totals.total, id, businessId),
+    ...totals.items.map(it => db.prepare('INSERT INTO InvoiceItem(id,invoiceId,lineNumber,description,quantity,unitPrice,taxCategoryId,amount) VALUES (?,?,?,?,?,?,?,?)')
+      .bind(crypto.randomUUID(), id, it.lineNumber, it.description, it.quantity, it.unitPrice, it.taxCategoryId ?? null, it.amount)),
+  ]);
+  return getInvoice(businessId, id);
 }
 
 const yen = (n: number) => `¥${n.toLocaleString("ja-JP")}`;
@@ -122,7 +117,7 @@ export async function sendInvoiceEmail(env: Bindings, businessId: string, id: st
     badRequest("メール送信が未設定です。RESEND_API_KEY と MAIL_FROM を設定してください");
   }
   const invoice = await prisma.invoice.findFirst({
-    where: { id, businessId },
+    where: { id, businessId, partner: { businessId } },
     include: { partner: true, items: true },
   });
   if (!invoice) notFound("請求書が見つかりません");
@@ -168,13 +163,15 @@ export async function sendInvoiceEmail(env: Bindings, businessId: string, id: st
 export async function deleteInvoice(businessId: string, id: string) {
   const existing = await prisma.invoice.findFirst({ where: { id, businessId } });
   if (!existing) notFound("請求書が見つかりません");
+  const settled=await requestDatabase().prepare('SELECT invoiceId FROM InvoicePaymentClaim WHERE businessId=? AND invoiceId=?').bind(businessId,id).first();
+  if(settled) badRequest("入金消込済みの請求書は削除できません");
   await prisma.invoice.delete({ where: { id } });
 }
 
 // 請求書を仕訳(売掛金/売上高)に計上する
 export async function postInvoiceToJournal(businessId: string, id: string) {
   const invoice = await prisma.invoice.findFirst({
-    where: { id, businessId },
+    where: { id, businessId, partner: { businessId } },
     include: { items: true, partner: true },
   });
   if (!invoice) notFound("請求書が見つかりません");
@@ -246,7 +243,7 @@ export async function recordInvoicePayment(
   paymentAccountId: string,
   paymentDate: Date
 ) {
-  const invoice = await prisma.invoice.findFirst({ where: { id, businessId }, include: { partner: true } });
+  const invoice = await prisma.invoice.findFirst({ where: { id, businessId, partner: { businessId } }, include: { partner: true } });
   if (!invoice) notFound("請求書が見つかりません");
   if (invoice!.status !== "SENT") badRequest("入金消込は「計上済み」の請求書のみ行えます");
 
@@ -256,34 +253,32 @@ export async function recordInvoicePayment(
   const receivable = await prisma.account.findFirst({ where: { businessId, code: "1110" } }); // 売掛金
   if (!receivable) badRequest("売掛金の勘定科目が見つかりません");
 
+  const db = requestDatabase();
+  const locked = await db.prepare('SELECT 1 FROM BusinessControl WHERE businessId=? AND closedThrough IS NOT NULL AND date(?)<=closedThrough')
+    .bind(businessId, d1Date(paymentDate)).first();
+  if (locked) badRequest('締め済み期間には入金を記録できません');
   const fiscalYear = await getOrCreateFiscalYearForDate(businessId, paymentDate);
-  const last = await prisma.journalEntry.findFirst({
-    where: { businessId },
-    orderBy: { entryNumber: "desc" },
-    select: { entryNumber: true },
-  });
-  const entryNumber = (last?.entryNumber ?? 0) + 1;
-
-  const entry = await prisma.journalEntry.create({
-    data: {
-      businessId,
-      fiscalYearId: fiscalYear.id,
-      entryNumber,
-      entryDate: paymentDate,
-      description: `入金消込 請求書 ${invoice!.invoiceNumber} (${invoice!.partner.name})`,
-      status: "CONFIRMED",
-      source: "INVOICE",
-      lines: {
-        create: [
-          { lineNumber: 1, side: "DEBIT", accountId: paymentAccount.id, partnerId: invoice!.partnerId, amount: invoice!.total },
-          { lineNumber: 2, side: "CREDIT", accountId: receivable.id, partnerId: invoice!.partnerId, amount: invoice!.total },
-        ],
-      },
-    },
-    include: { lines: true },
-  });
-
-  await prisma.invoice.update({ where: { id }, data: { status: "PAID" } });
-
-  return entry;
+  const journalEntryId = crypto.randomUUID();
+  // D1 batch is atomic. The unique claim serializes concurrent settlement attempts.
+  // Its deferred journal FK is satisfied later in the same batch, never by a separate write.
+  try {
+    await db.batch([
+      db.prepare('INSERT INTO InvoicePaymentClaim(invoiceId,businessId,paymentDate,journalEntryId) VALUES (?,?,?,?)')
+        .bind(id, businessId, d1Date(paymentDate), journalEntryId),
+      db.prepare(`INSERT INTO JournalEntry(id,businessId,fiscalYearId,entryNumber,entryDate,description,status,source,updatedAt)
+        SELECT ?,?,?,COALESCE((SELECT MAX(entryNumber) FROM JournalEntry WHERE businessId=?),0)+1,?,?,'CONFIRMED','INVOICE',?
+        FROM Invoice WHERE id=? AND businessId=? AND status='SENT'`)
+        .bind(journalEntryId,businessId,fiscalYear.id,businessId,d1Date(paymentDate),`入金消込 請求書 ${invoice!.invoiceNumber} (${invoice!.partner.name})`,d1Date(new Date()),id,businessId),
+      ...[{lineNumber:1,side:'DEBIT',accountId:paymentAccount.id},{lineNumber:2,side:'CREDIT',accountId:receivable.id}].map(line=>
+        db.prepare(`INSERT INTO JournalEntryLine(id,journalEntryId,lineNumber,side,accountId,partnerId,amount)
+          SELECT ?,?,?,?,?,partnerId,total FROM Invoice WHERE id=? AND businessId=? AND status='SENT'`)
+          .bind(crypto.randomUUID(),journalEntryId,line.lineNumber,line.side,line.accountId,id,businessId)),
+      db.prepare("UPDATE Invoice SET status='PAID' WHERE id=? AND businessId=? AND status='SENT'").bind(id,businessId),
+    ]);
+  } catch (error) {
+    const current = await prisma.invoice.findFirst({where:{id,businessId},select:{status:true}});
+    if (current?.status === 'PAID') badRequest('この請求書の入金は記録済みです');
+    throw error;
+  }
+  return prisma.journalEntry.findUniqueOrThrow({where:{id:journalEntryId},include:{lines:true}});
 }

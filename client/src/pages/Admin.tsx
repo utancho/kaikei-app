@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2, KeyRound, Copy, X, Check, ScrollText, ShieldOff } from "lucide-react";
+import { Users, TrendingUp, CircleCheck, Clock, LogOut, Wallet, Search, Download, AlertTriangle, XCircle, Building2, KeyRound, Copy, X, Check, ScrollText, ShieldOff, BookOpen } from "lucide-react";
 import { api, ApiError } from "../lib/api";
 import { formatDate, formatYen } from "../lib/format";
 import type { AdminBusiness, AdminStats, AdminUser, AuditLog, SubscriptionStatus } from "../lib/types";
@@ -269,13 +269,18 @@ export default function Admin() {
           title="管理者ダッシュボード"
           subtitle="全ユーザーの登録状況と契約状況を確認できます"
           action={
-            <button
-              className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-700 bg-white"
-              onClick={() => exportUsersCsv(filteredUsers)}
-              disabled={filteredUsers.length === 0}
-            >
-              <Download size={14} /> CSVエクスポート
-            </button>
+            <div className="flex items-center gap-2">
+              <Link to="/admin/blog" className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-700 bg-white">
+                <BookOpen size={14} /> ブログ管理
+              </Link>
+              <button
+                className="flex items-center gap-1.5 text-sm border border-gray-300 rounded-lg px-3 py-1.5 hover:bg-gray-50 text-gray-700 bg-white disabled:opacity-50"
+                onClick={() => exportUsersCsv(filteredUsers)}
+                disabled={filteredUsers.length === 0}
+              >
+                <Download size={14} /> CSVエクスポート
+              </button>
+            </div>
           }
         />
 
