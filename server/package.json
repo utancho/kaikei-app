@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
+    "test": "tsx --test tests/*.test.mjs",
     "dev": "wrangler dev",
     "build": "prisma generate && tsc -p tsconfig.json --noEmit",
     "prisma:generate": "prisma generate",

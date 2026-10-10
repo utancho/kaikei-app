@@ -3,6 +3,7 @@ import { badRequest, notFound } from '../lib/httpError.js';
 import { tokenHash } from '../lib/sessionSecurity.js';
 import { verifyPassword } from '../lib/auth.js';
 import { verifyTOTP } from '../lib/totp.js';
+import { openTotpSecret } from '../lib/totpSecret.js';
 import { consumeBackupCode } from './twoFactorService.js';
 import { isEmailEnabled, sendEmail, renderEmail } from './emailService.js';
 import type { Bindings } from '../types/env.js';
@@ -27,7 +28,7 @@ export async function requestEmailVerification(env:Bindings,userId:string) {
     env.DB.prepare('INSERT INTO EmailVerification(tokenHash,userId,email,expiresAt) VALUES (?,?,?,?)').bind(hash,userId,user!.email,now+86400),
   ]);
   const url=new URL('/account',env.APP_URL); url.searchParams.set('verifyEmailToken',token);
-  const result=await sendEmail(env,{to:user!.email,subject:'keirio メールアドレスの確認',html:renderEmail({heading:'メールアドレスを確認',bodyHtml:'24時間以内にログインした状態で確認してください。',actionLabel:'確認する',actionUrl:url.toString()}),text:`メールアドレスを確認: ${url}`});
+  const result=await sendEmail(env,{quotaScope:`security:verification:${userId}`,to:user!.email,subject:'keirio メールアドレスの確認',html:renderEmail({heading:'メールアドレスを確認',bodyHtml:'24時間以内にログインした状態で確認してください。',actionLabel:'確認する',actionUrl:url.toString()}),text:`メールアドレスを確認: ${url}`});
   if(!result.sent) await env.DB.prepare('DELETE FROM EmailVerification WHERE tokenHash=?').bind(hash).run();
   return result;
 }
@@ -59,11 +60,11 @@ export async function deleteSession(db:D1Database,userId:string,id:string) {
   return {ok:true};
 }
 
-export async function logoutAll(db:D1Database,userId:string,password:string,code?:string) {
+export async function logoutAll(db:D1Database,userId:string,password:string,code?:string,key?:string) {
   const user=await prisma.user.findUnique({where:{id:userId}});
   if(!user || !await verifyPassword(password,user.passwordHash)) badRequest('パスワードが正しくありません');
   if(user!.twoFactorEnabled) {
-    const valid=code && ((user!.twoFactorSecret && await verifyTOTP(user!.twoFactorSecret,code)) || await consumeBackupCode(userId,code));
+    const valid=code && ((user!.twoFactorSecret && await verifyTOTP(await openTotpSecret(user!.twoFactorSecret,userId,key),code)) || await consumeBackupCode(userId,code));
     if(!valid) badRequest('認証コードが正しくありません');
   }
   await db.batch([

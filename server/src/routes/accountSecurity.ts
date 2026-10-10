@@ -22,7 +22,7 @@ accountSecurityRouter.get('/sessions',async c=>c.json(await listSessions(c.env.D
 accountSecurityRouter.delete('/sessions/:id',async c=>c.json(await deleteSession(c.env.DB,c.get('userId'),c.req.param('id'))));
 accountSecurityRouter.post('/logout-all',async c=>{
   const {password,code}=z.object({password:z.string().min(1).max(200),code:z.string().max(100).optional()}).parse(await c.req.json());
-  const result=await logoutAll(c.env.DB,c.get('userId'),password,code);
+  const result=await logoutAll(c.env.DB,c.get('userId'),password,code,c.env.TOTP_ENCRYPTION_KEY ?? c.env.JWT_SECRET);
   deleteCookie(c,AUTH_COOKIE_NAME,{path:'/'});return c.json(result);
 });
 accountSecurityRouter.get('/notifications',async c=>c.json(await listNotifications(c.env.DB,c.get('userId'))));

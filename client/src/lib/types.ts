@@ -8,6 +8,7 @@ export interface Business {
   name: string;
   type: BusinessType;
   representativeName?: string | null;
+  invoiceRegistrationNumber?: string | null;
   postalCode?: string | null;
   address?: string | null;
   fiscalYearStartMonth: number;
@@ -202,6 +203,8 @@ export interface Invoice {
   taxAmount: number;
   total: number;
   items: InvoiceItem[];
+  issuer?: {name:string;address:string|null;representativeName:string|null;invoiceRegistrationNumber:string|null} | null;
+  taxBreakdown?: {rate:number;subtotal:number;taxAmount:number;isReducedRate:boolean;lineNumbers:number[]}[] | null;
 }
 
 export type DepreciationMethod = "STRAIGHT_LINE" | "DECLINING_BALANCE";
@@ -294,6 +297,9 @@ export interface NationalLocalTax {
 }
 
 export interface ConsumptionTaxReturn {
+  calculationMode?: 'REFERENCE';
+  legacyInvoiceCount?: number;
+  unclassifiedInvoiceSales?: number;
   business: { name: string; taxationType: string };
   period: { from: string; to: string };
   isExempt: boolean;

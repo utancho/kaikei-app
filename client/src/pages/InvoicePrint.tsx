@@ -18,9 +18,11 @@ export default function InvoicePrint() {
   }, [currentBusiness, id]);
 
   if (!currentBusiness || !invoice) return <div className="p-10 text-gray-400 text-sm">読み込み中...</div>;
+  const issuer = invoice.issuer ?? currentBusiness;
 
   return (
     <div className="min-h-screen bg-gray-100 py-8 print:bg-white print:py-0">
+      {!invoice.issuer && invoice.status !== 'DRAFT' && <p role="alert" className="max-w-2xl mx-auto mb-4 p-3 bg-amber-50 text-amber-900 text-sm no-print">この旧請求書には発行時の事業者情報が保存されていません。再印刷前に原本と照合してください。表示には現在の事業者情報を使用しています。</p>}
       <div className="max-w-2xl mx-auto mb-4 flex justify-end no-print">
         <Button icon={<Printer size={16} />} onClick={() => window.print()}>
           印刷する
@@ -37,9 +39,10 @@ export default function InvoicePrint() {
             {invoice.dueDate && <div className="text-gray-500">支払期限: {formatDate(invoice.dueDate)}</div>}
           </div>
           <div className="text-right">
-            <div className="font-semibold">{currentBusiness.name}</div>
-            {currentBusiness.representativeName && <div className="text-gray-500">{currentBusiness.representativeName}</div>}
-            {currentBusiness.address && <div className="text-gray-500">{currentBusiness.address}</div>}
+            <div className="font-semibold">{issuer.name}</div>
+            {issuer.representativeName && <div className="text-gray-500">{issuer.representativeName}</div>}
+            {issuer.address && <div className="text-gray-500">{issuer.address}</div>}
+            {issuer.invoiceRegistrationNumber && <div className="text-gray-500">登録番号: {issuer.invoiceRegistrationNumber}</div>}
           </div>
         </div>
 
@@ -54,20 +57,26 @@ export default function InvoicePrint() {
               <th className="py-2 font-normal">品目</th>
               <th className="py-2 font-normal text-right w-16">数量</th>
               <th className="py-2 font-normal text-right w-28">単価</th>
+              <th className="py-2 font-normal text-right w-16">税率</th>
               <th className="py-2 font-normal text-right w-32">金額</th>
             </tr>
           </thead>
           <tbody>
             {invoice.items.map((it, i) => (
               <tr key={i} className="border-b border-gray-200">
-                <td className="py-2">{it.description}</td>
+                <td className="py-2">{it.description}{invoice.taxBreakdown?.some(group=>group.isReducedRate && group.lineNumbers.includes(it.lineNumber ?? i+1)) ? ' ※' : ''}</td>
                 <td className="py-2 text-right tabular-nums">{it.quantity}</td>
                 <td className="py-2 text-right tabular-nums">{formatYen(it.unitPrice)}</td>
+                <td className="py-2 text-right">{invoice.taxBreakdown?.find(group=>group.lineNumbers.includes(it.lineNumber ?? i+1))?.rate !== undefined ? `${Math.round(invoice.taxBreakdown.find(group=>group.lineNumbers.includes(it.lineNumber ?? i+1))!.rate*100)}%` : '—'}</td>
                 <td className="py-2 text-right tabular-nums">{formatYen(it.amount ?? it.quantity * it.unitPrice)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        {invoice.taxBreakdown?.some(group=>group.isReducedRate) && <p className="text-xs text-gray-500 mb-4">※ 軽減税率対象</p>}
+        {invoice.taxBreakdown && <div className="mb-4 space-y-1 text-xs text-right text-gray-600">
+          {invoice.taxBreakdown.map(group=><div key={group.rate}>{Math.round(group.rate*100)}%対象（税抜）: {formatYen(group.subtotal)} ／ 消費税: {formatYen(group.taxAmount)}</div>)}
+        </div>}
 
         <div className="flex justify-end mb-8">
           <div className="w-56 space-y-1.5">

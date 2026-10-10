@@ -36,3 +36,4 @@ backups/
 *.backup
 *.bak
 scripts/.public-pages-build.mjs
+/work/

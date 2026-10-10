@@ -1,5 +1,7 @@
 # デプロイ手順(Cloudflare Workers + D1、単一プロジェクト)
 
+請求書計上記録・2FA暗号化を含む版の反映は、先に [本番向け修正版・反映手順](PRODUCTION_READINESS.md) を確認してください。0024～0028の移行、秘密鍵の維持、旧データの照合が必要です。
+
 このアプリは**1つのCloudflare Worker**から、静的サイト(React)とAPI(Hono)の両方を
 配信します。CloudflareのGitHub連携(Workers Builds)を使う場合、リポジトリのルートに
 `wrangler.toml` があるので特別な設定は基本的に不要です。

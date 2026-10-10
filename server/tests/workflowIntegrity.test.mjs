@@ -55,3 +55,27 @@ test('history budget measures Japanese UTF8 bytes rather than characters',()=>{
   assert.equal(after-before,306);
   db.close();
 });
+
+test('one business cannot exhaust the audit capacity of another business',()=>{
+  const db=fixture();
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE name='BusinessHistoryBudget'").get());
+  db.exec("INSERT INTO Business(id,ownerId,name,updatedAt) VALUES ('c','qa','Other',CURRENT_TIMESTAMP)");
+  db.exec("UPDATE BusinessHistoryBudget SET rows=5000 WHERE businessId='b'");
+  assert.throws(()=>db.exec("INSERT INTO BusinessHistory(businessId,entityType,entityId,action) VALUES ('b','TEST','x','TEST')"),/BUSINESS_HISTORY_QUOTA/);
+  db.exec("INSERT INTO BusinessHistory(businessId,entityType,entityId,action) VALUES ('c','TEST','x','TEST')");
+  assert.equal(db.prepare("SELECT rows FROM BusinessHistoryBudget WHERE businessId='c'").get().rows,1);
+  db.close();
+});
+
+test('membership changes retain immutable audit records without invitation secrets',()=>{
+  const db=fixture();
+  assert.ok(db.prepare("SELECT name FROM sqlite_master WHERE name='BusinessMemberAudit'").get());
+  db.exec("INSERT INTO User(id,email,passwordHash) VALUES ('member-user','member@example.test','test'); INSERT INTO BusinessMember(id,businessId,email,status,role,inviteTokenHash) VALUES ('member','b','member@example.test','PENDING','VIEWER','private-invite-hash')");
+  db.exec("UPDATE BusinessMember SET userId='member-user',status='ACTIVE',inviteTokenHash=NULL WHERE id='member'; DELETE FROM BusinessMember WHERE id='member'");
+  const records=db.prepare("SELECT action,actorId,beforeJson,afterJson FROM BusinessMemberAudit WHERE businessId='b' ORDER BY id").all();
+  assert.deepEqual(records.map(record=>record.action),['MEMBER_INVITED','MEMBER_JOINED','MEMBER_REMOVED']);
+  assert.deepEqual(records.map(record=>record.actorId),['qa','member-user','qa']);
+  assert.ok(!JSON.stringify(records).includes('private-invite-hash'));
+  assert.throws(()=>db.exec('DELETE FROM BusinessMemberAudit'),/IMMUTABLE_MEMBER_AUDIT/);
+  db.close();
+});

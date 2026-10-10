@@ -49,7 +49,9 @@ export const authAttemptLimit = createMiddleware<AppEnv>(async (c, next) => {
   const body: Record<string, unknown> = await c.req.json<Record<string, unknown>>().catch(() => ({}));
   const subject = typeof body.email === "string" ? body.email.trim().toLowerCase() : c.get("userId");
   if (subject) {
-    const account = await consumeAttempt(c.env.DB, `${path}:account:${subject}`, reset ? 5 : 20, reset ? 3600 : 900);
+    // Unauthenticated email input must not lock the account across all networks.
+    const accountKey = path.endsWith('/login') ? `${path}:account:${subject}:ip:${ip}` : `${path}:account:${subject}`;
+    const account = await consumeAttempt(c.env.DB, accountKey, reset ? 5 : 20, reset ? 3600 : 900);
     if (!account.allowed) {
       c.header("Retry-After", String(account.retryAfter));
       return c.json({ error: "試行回数が上限に達しました。時間をおいて再試行してください" }, 429);

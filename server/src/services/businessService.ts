@@ -33,6 +33,7 @@ export interface CreateBusinessInput {
   name: string;
   type: BusinessType;
   representativeName?: string;
+  invoiceRegistrationNumber?: string | null;
   postalCode?: string;
   address?: string;
   fiscalYearStartMonth?: number;
@@ -48,6 +49,7 @@ export async function createBusinessWithDefaults(ownerId: string, input: CreateB
       name: input.name,
       type: input.type,
       representativeName: input.representativeName,
+      invoiceRegistrationNumber: input.invoiceRegistrationNumber,
       postalCode: input.postalCode,
       address: input.address,
       fiscalYearStartMonth: input.type === "INDIVIDUAL" ? 1 : input.fiscalYearStartMonth ?? 4,

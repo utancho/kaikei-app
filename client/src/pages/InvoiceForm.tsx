@@ -47,6 +47,10 @@ export default function InvoiceForm() {
   useEffect(() => {
     if (!currentBusiness || !isEdit || !id) return;
     api.getInvoice(currentBusiness.id, id).then((inv) => {
+      if (inv.status !== 'DRAFT') {
+        navigate(`/invoices/${id}/print`, { replace: true });
+        return;
+      }
       setPartnerId(inv.partnerId);
       setInvoiceNumber(inv.invoiceNumber);
       setIssueDate(toInputDate(inv.issueDate));

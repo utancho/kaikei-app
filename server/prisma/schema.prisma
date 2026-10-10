@@ -108,6 +108,7 @@ model Business {
   name                  String // 屋号 or 会社名
   type                  String   @default("INDIVIDUAL") // INDIVIDUAL | CORPORATE
   representativeName    String?
+  invoiceRegistrationNumber String?
   postalCode            String?
   address               String?
   fiscalYearStartMonth  Int      @default(1) // 個人は1固定、法人は任意
@@ -320,6 +321,9 @@ model Invoice {
   dueDate       DateTime?
   status        String   @default("DRAFT") // DRAFT | SENT | PAID | VOID
   notes         String?
+  issuerJson    String?
+  recipientJson String?
+  taxBreakdownJson String?
   subtotal      Int      @default(0)
   taxAmount     Int      @default(0)
   total         Int      @default(0)
