@@ -3,6 +3,9 @@
 # ここに書いたキーは wrangler.toml の [vars] と同名でも local dev では優先されます。
 
 JWT_SECRET="change-me-to-a-random-secret"
+# 新しいバージョンで2FAを設定する前に、JWT_SECRETと異なる長いランダム値を設定します。
+# 未設定時は互換用にJWT_SECRETを使用します。暗号化後に鍵を変更すると復号できません。
+# TOTP_ENCRYPTION_KEY="set-a-separate-random-secret-before-first-enrollment"
 ENVIRONMENT="development"
 APP_URL="http://localhost:5173"
 

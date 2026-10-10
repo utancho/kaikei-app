@@ -4,6 +4,7 @@ import { hashPassword, signToken, verifyPassword } from "../lib/auth.js";
 import { verifyTOTP } from "../lib/totp.js";
 import { recordAudit, type AuditContext } from "./auditService.js";
 import { consumeBackupCode, countRemainingBackupCodes } from "./twoFactorService.js";
+import { openTotpSecret, sealTotpSecret } from '../lib/totpSecret.js';
 
 function sanitizeUser(user: {
   id: string;
@@ -56,7 +57,8 @@ export async function login(
   password: string,
   jwtSecret: string,
   code?: string,
-  context?: AuditContext
+  context?: AuditContext,
+  encryptionKey: string = jwtSecret
 ) {
   email = email.trim();
   let user = await prisma.user.findUnique({ where: { email } });
@@ -81,12 +83,15 @@ export async function login(
     if (!code) {
       return { twoFactorRequired: true as const };
     }
-    const totpOk = user!.twoFactorSecret ? await verifyTOTP(user!.twoFactorSecret, code) : false;
+    const totpOk = user!.twoFactorSecret ? await verifyTOTP(await openTotpSecret(user!.twoFactorSecret,user!.id,encryptionKey), code) : false;
     // 認証アプリのコードが一致しない場合はバックアップコードを試す(1回限り消費)。
     const codeOk = totpOk || (await consumeBackupCode(user!.id, code));
     if (!codeOk) {
       await recordAudit({ action: "LOGIN_FAILED", userId: user!.id, userEmail: email, detail: "2FAコード不一致", context });
       badRequest("認証コードが正しくありません");
+    }
+    if (user!.twoFactorSecret && !user!.twoFactorSecret.startsWith('enc:')) {
+      await prisma.user.updateMany({where:{id:user!.id,twoFactorSecret:user!.twoFactorSecret,securityVersion:user!.securityVersion},data:{twoFactorSecret:await sealTotpSecret(user!.twoFactorSecret,user!.id,encryptionKey)}});
     }
   }
 

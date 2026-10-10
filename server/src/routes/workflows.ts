@@ -49,7 +49,12 @@ export const recordBusinessOperation=createMiddleware<AppEnv>(async(c,next)=>{
   await db.prepare('DELETE FROM BusinessWriteReservation WHERE expiresAt<=?').bind(now).run();
   const held=await db.prepare('SELECT id FROM BusinessWriteReservation WHERE businessId=?').bind(businessId).first();
   if(held) return c.json({error:'この事業者は別の変更を処理中です。少し待って再試行してください'},409);
-  const acquired=await db.prepare(`INSERT OR IGNORE INTO BusinessWriteReservation(businessId,id,expiresAt,reservedBytes,reservedRows) SELECT ?,?,?,?,? WHERE EXISTS(SELECT 1 FROM WorkflowBudget WHERE name='history' AND bytes+coalesce((SELECT sum(reservedBytes) FROM BusinessWriteReservation),0)+?<=52428800 AND rows+coalesce((SELECT sum(reservedRows) FROM BusinessWriteReservation),0)+?<=50000) RETURNING id`).bind(businessId,claim,now+600,reservedBytes,reservedRows,reservedBytes,reservedRows).first();
+  const acquired=await db.prepare(`INSERT OR IGNORE INTO BusinessWriteReservation(businessId,id,expiresAt,reservedBytes,reservedRows)
+    SELECT ?,?,?,?,? WHERE
+      coalesce((SELECT bytes FROM BusinessHistoryBudget WHERE businessId=?),0)+?<=5242880 AND
+      coalesce((SELECT rows FROM BusinessHistoryBudget WHERE businessId=?),0)+?<=5000 AND
+      EXISTS(SELECT 1 FROM WorkflowBudget WHERE name='history' AND bytes+coalesce((SELECT sum(reservedBytes) FROM BusinessWriteReservation),0)+?<=52428800 AND rows+coalesce((SELECT sum(reservedRows) FROM BusinessWriteReservation),0)+?<=50000)
+    RETURNING id`).bind(businessId,claim,now+600,reservedBytes,reservedRows,businessId,reservedBytes,businessId,reservedRows,reservedBytes,reservedRows).first();
   if(!acquired) return c.json({error:'無料履歴枠の残量が不足しています。業務JSONを保存して運営へご連絡ください'},413);
   try{
     // Immutable actor attribution is reserved BEFORE mutation. Trigger records show actual committed before/after states.

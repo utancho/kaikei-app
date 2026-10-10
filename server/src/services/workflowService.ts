@@ -98,6 +98,8 @@ export async function backup(businessId:string) {
   result.control=await db.prepare('SELECT * FROM BusinessControl WHERE businessId=?').bind(businessId).first();
   result.recurringRuns=(await db.prepare('SELECT run.* FROM BusinessRecurringRun run JOIN BusinessRecurring rule ON rule.id=run.recurringId WHERE rule.businessId=?').bind(businessId).all()).results;
   result.paymentClaims=(await db.prepare('SELECT * FROM InvoicePaymentClaim WHERE businessId=?').bind(businessId).all()).results;
+  result.postingClaims=(await db.prepare('SELECT * FROM InvoicePostingClaim WHERE businessId=?').bind(businessId).all()).results;
+  result.memberAudit=(await db.prepare('SELECT * FROM BusinessMemberAudit WHERE businessId=? LIMIT 10001').bind(businessId).all()).results;
   if(Object.values(result).some(v=>Array.isArray(v)&&v.length>10000)) throw new HttpError(413,'一括出力の上限を超えています。運営へ分割出力を依頼してください');
   return result;
 }

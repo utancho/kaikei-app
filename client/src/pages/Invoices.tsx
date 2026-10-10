@@ -189,12 +189,12 @@ export default function Invoices() {
                         <button className="text-gray-400 hover:text-brand-600" title="メールで送信" onClick={() => handleSendEmail(inv)}>
                           <Mail size={15} />
                         </button>
-                        <Link className="text-gray-400 hover:text-brand-600" to={`/invoices/${inv.id}`}>
+                        {inv.status === 'DRAFT' && <Link className="text-gray-400 hover:text-brand-600" to={`/invoices/${inv.id}`} title="編集">
                           <Pencil size={15} />
-                        </Link>
-                        <button className="text-gray-400 hover:text-red-500" onClick={() => handleDelete(inv)}>
+                        </Link>}
+                        {inv.status === 'DRAFT' && <button className="text-gray-400 hover:text-red-500" onClick={() => handleDelete(inv)} title="削除">
                           <Trash2 size={15} />
-                        </button>
+                        </button>}
                       </div>
                     </td>
                   </tr>

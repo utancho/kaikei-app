@@ -12,6 +12,7 @@ function database() {
   sqlite.exec('CREATE TABLE User(id TEXT PRIMARY KEY,email TEXT,securityVersion INTEGER DEFAULT 0); CREATE TABLE RevokedSession(tokenHash TEXT PRIMARY KEY,expiresAt INTEGER);');
   sqlite.exec(readFileSync(new URL('../migrations/0019_identity_workflows.sql',import.meta.url),'utf8'));
   sqlite.exec(readFileSync(new URL('../migrations/0023_session_activity_versions.sql',import.meta.url),'utf8'));
+  sqlite.exec(readFileSync(new URL('../migrations/0025_email_quota_scopes.sql',import.meta.url),'utf8'));
   sqlite.prepare('INSERT INTO User(id,email) VALUES (?,?)').run('owner','owner@example.test');
   sqlite.prepare('INSERT INTO User(id,email) VALUES (?,?)').run('other','other@example.test');
   const db={prepare(sql){
@@ -105,5 +106,18 @@ test('disabled email and the exhausted global budget make no provider request',a
     sqlite.prepare('INSERT INTO EmailDailyUsage(day,attempts) VALUES (?,90)').run(new Date().toISOString().slice(0,10));
     assert.equal((await sendEmail({DB:db,RESEND_API_KEY:'test-only',MAIL_FROM:'test@example.test'},{to:'x',subject:'x',html:'x'})).sent,false);
     assert.equal(calls,0);
+  }finally{globalThis.fetch=original;sqlite.close();}
+});
+
+test('invoice tenant exhaustion leaves verification mail capacity available',async()=>{
+  const {db,sqlite}=database();const original=globalThis.fetch;
+  const params={to:'recipient@example.test',subject:'test',html:'<p>test</p>'};
+  const env={DB:db,RESEND_API_KEY:'test-only',MAIL_FROM:'test@example.test'};
+  globalThis.fetch=async()=>new Response('{}',{status:200});
+  try{
+    for(let i=0;i<20;i++) assert.equal((await sendEmail(env,{...params,quotaScope:'invoice:business-one'})).sent,true);
+    assert.equal((await sendEmail(env,{...params,quotaScope:'invoice:business-one'})).sent,false);
+    assert.equal((await sendEmail(env,{...params,quotaScope:'invoice:business-two'})).sent,true);
+    assert.equal((await sendEmail(env,{...params,quotaScope:'security:verification:user-one'})).sent,true);
   }finally{globalThis.fetch=original;sqlite.close();}
 });

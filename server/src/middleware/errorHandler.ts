@@ -13,7 +13,8 @@ export async function errorHandler(err: unknown, c: Context) {
   }
   const message=err instanceof Error?err.message:String(err);
   if (/PERIOD_LOCKED/.test(message)) return c.json({error:"締め済み期間は変更できません。オーナーによる再開が必要です",code:"PERIOD_LOCKED"},409);
-  if (/EVIDENCE_QUOTA|WORKFLOW_QUOTA/.test(message)) return c.json({error:"無料保存枠の上限です。追加課金は行いません",code:"FREE_QUOTA"},413);
+  if (/EVIDENCE_QUOTA|WORKFLOW_QUOTA|BUSINESS_HISTORY_QUOTA/.test(message)) return c.json({error:"保存枠の上限です。業務JSONを保存して運営へご連絡ください",code:"FREE_QUOTA"},413);
+  if (/INVOICE_POSTED|INVOICE_POSTING_|InvoicePostingClaim/.test(message)) return c.json({error:'この請求書は計上済みか、請求書と仕訳の内容が一致しないため変更できません',code:'INVOICE_POSTING_CONFLICT'},409);
   if (/IMMUTABLE_HISTORY/.test(message)) return c.json({error:"変更履歴は変更・削除できません"},403);
   if (/INVOICE_PAYMENT_UNAVAILABLE|PAYMENT_CLAIM_IMMUTABLE|InvoicePaymentClaim/.test(message)) return c.json({error:"この請求書の入金は処理済みか、変更できない状態です"},409);
   console.error(err);

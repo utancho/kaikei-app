@@ -56,9 +56,12 @@ export default function ConsumptionTax() {
 
       <div className="flex items-start gap-2 bg-sky-50 text-sky-800 text-xs px-4 py-2.5 rounded-lg border border-sky-200">
         <Info size={15} className="shrink-0 mt-0.5" />
-        仕訳データの税区分から自動集計した参考値です。国税・地方消費税の按分は標準税率換算の概算です。実際の申告にあたっては税理士等の確認を受けてください。課税方式は「設定」から変更できます。
+        仕訳の税区分と計上済み請求書の税率別内訳から集計した参考値です。国税・地方消費税の按分は概算です。実際の申告にあたっては税理士等の確認を受けてください。課税方式は「設定」から変更できます。
       </div>
 
+      {((statement.legacyInvoiceCount ?? 0)>0 || (statement.unclassifiedInvoiceSales ?? 0)!==0) && <div role="alert" className="rounded-lg bg-amber-50 border border-amber-200 p-4 text-sm text-amber-900">
+        集計の確認が必要です。税率別内訳または計上の対応を確認できない旧請求書が{statement.legacyInvoiceCount ?? 0}件、税区分未指定の請求額が{formatYen(statement.unclassifiedInvoiceSales ?? 0)}あります。元の請求書と仕訳を照合してください。
+      </div>}
       {statement.isExempt ? (
         <Card className="p-6 text-center text-gray-500 text-sm">
           この事業者は免税事業者に設定されているため、消費税の申告は不要です。

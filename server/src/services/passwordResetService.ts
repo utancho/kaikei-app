@@ -31,6 +31,7 @@ export async function requestPasswordReset(env: Bindings, email: string, context
     });
     const resetUrl = `${env.APP_URL}/reset-password?token=${token}`;
     await sendEmail(env, {
+      quotaScope: `security:password-reset:${user.id}`,
       to: user.email,
       subject: "【Kaikei】パスワード再設定のご案内",
       html: renderEmail({

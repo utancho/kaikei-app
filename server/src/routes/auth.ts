@@ -55,7 +55,7 @@ authRouter.post("/signup", async (c) => {
 
 authRouter.post("/login", async (c) => {
   const input = loginInputSchema.parse(await c.req.json());
-  const result = await login(input.email, input.password, c.env.JWT_SECRET, input.code, auditContext(c));
+  const result = await login(input.email, input.password, c.env.JWT_SECRET, input.code, auditContext(c), c.env.TOTP_ENCRYPTION_KEY ?? c.env.JWT_SECRET);
   if ("twoFactorRequired" in result) {
     return c.json({ twoFactorRequired: true });
   }
@@ -78,24 +78,24 @@ authRouter.post("/reset-password", async (c) => {
 
 authRouter.post("/2fa/setup", requireAuth, async (c) => {
   const { password } = twoFactorSetupSchema.parse(await c.req.json());
-  return c.json(await setupTwoFactor(c.get("userId"), password));
+  return c.json(await setupTwoFactor(c.get("userId"), password, c.env.TOTP_ENCRYPTION_KEY ?? c.env.JWT_SECRET));
 });
 
 authRouter.post("/2fa/enable", requireAuth, async (c) => {
   const { code, password } = twoFactorEnableSchema.parse(await c.req.json());
-  const result = await enableTwoFactor(c.env.DB, c.get("userId"), code, password, auditContext(c));
+  const result = await enableTwoFactor(c.env.DB, c.get("userId"), code, password, auditContext(c), c.env.TOTP_ENCRYPTION_KEY ?? c.env.JWT_SECRET);
   setSessionCookie(c, await signToken({ userId: c.get("userId"), securityVersion: result.securityVersion }, c.env.JWT_SECRET));
   return c.json({ enabled: result.enabled, backupCodes: result.backupCodes });
 });
 
 authRouter.post("/2fa/backup-codes", requireAuth, async (c) => {
   const { password, code } = twoFactorDisableSchema.parse(await c.req.json());
-  return c.json(await regenerateBackupCodes(c.env.DB, c.get("userId"), password, code, auditContext(c)));
+  return c.json(await regenerateBackupCodes(c.env.DB, c.get("userId"), password, code, auditContext(c), c.env.TOTP_ENCRYPTION_KEY ?? c.env.JWT_SECRET));
 });
 
 authRouter.post("/2fa/disable", requireAuth, async (c) => {
   const { password, code } = twoFactorDisableSchema.parse(await c.req.json());
-  const result = await disableTwoFactor(c.get("userId"), password, code, auditContext(c));
+  const result = await disableTwoFactor(c.get("userId"), password, code, auditContext(c), c.env.TOTP_ENCRYPTION_KEY ?? c.env.JWT_SECRET);
   setSessionCookie(c, await signToken({ userId: c.get("userId"), securityVersion: result.securityVersion }, c.env.JWT_SECRET));
   return c.json({ enabled: result.enabled });
 });

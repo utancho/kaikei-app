@@ -89,6 +89,7 @@ export default function Settings() {
 
   const [name, setName] = useState("");
   const [representativeName, setRepresentativeName] = useState("");
+  const [invoiceRegistrationNumber, setInvoiceRegistrationNumber] = useState('');
   const [taxationType, setTaxationType] = useState("EXEMPT");
   const [simplifiedTaxCategory, setSimplifiedTaxCategory] = useState(5);
   const [blueReturnDeduction, setBlueReturnDeduction] = useState(0);
@@ -103,6 +104,7 @@ export default function Settings() {
     if (currentBusiness) {
       setName(currentBusiness.name);
       setRepresentativeName(currentBusiness.representativeName ?? "");
+      setInvoiceRegistrationNumber(currentBusiness.invoiceRegistrationNumber ?? '');
       setTaxationType(currentBusiness.taxationType);
       setSimplifiedTaxCategory(currentBusiness.simplifiedTaxCategory);
       setBlueReturnDeduction(currentBusiness.blueReturnDeduction);
@@ -113,7 +115,7 @@ export default function Settings() {
     if (!currentBusiness) return;
     setSaving(true);
     try {
-      await api.updateBusiness(currentBusiness.id, { name, representativeName, taxationType, simplifiedTaxCategory, blueReturnDeduction });
+      await api.updateBusiness(currentBusiness.id, { name, representativeName, invoiceRegistrationNumber, taxationType, simplifiedTaxCategory, blueReturnDeduction });
       await refresh();
       toast.success("設定を保存しました");
     } catch (e) {
@@ -186,6 +188,11 @@ export default function Settings() {
           <div>
             <label className={labelClass}>代表者名</label>
             <input className={`${inputClass} w-full`} value={representativeName} onChange={(e) => setRepresentativeName(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelClass} htmlFor="invoice-registration-number">適格請求書発行事業者の登録番号</label>
+            <input id="invoice-registration-number" className={`${inputClass} w-full`} value={invoiceRegistrationNumber} onChange={e=>setInvoiceRegistrationNumber(e.target.value.toUpperCase())} placeholder="T1234567890123" maxLength={14} />
+            <p className="text-xs text-gray-500 mt-1">登録済みの番号を入力してください。未登録の場合は空欄にします。保存後に計上する請求書に反映されます。</p>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>

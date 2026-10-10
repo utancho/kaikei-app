@@ -3,7 +3,6 @@ import {
   ACCOUNT_CATEGORIES,
   BUSINESS_TYPES,
   ENTRY_SIDES,
-  INVOICE_STATUSES,
   PARTNER_TYPES,
   TAXATION_TYPES,
 } from "./enums.js";
@@ -44,6 +43,7 @@ export const businessInputSchema = z.object({
   name: z.string().min(1, "屋号/会社名を入力してください"),
   type: z.enum(BUSINESS_TYPES),
   representativeName: z.string().optional(),
+  invoiceRegistrationNumber: z.string().trim().regex(/^T[0-9]{13}$/, '登録番号はTと13桁の数字で入力してください').or(z.literal('')).nullable().optional().transform(value => value === '' ? null : value),
   postalCode: z.string().optional(),
   address: z.string().optional(),
   fiscalYearStartMonth: z.number().int().min(1).max(12).optional(),
@@ -90,7 +90,7 @@ export const journalLineInputSchema = z.object({
   amount: z.number().int().positive("金額は1円以上で入力してください"),
   taxAmount: z.number().int().min(0).optional(),
   description: z.string().optional(),
-});
+}).refine(line => (line.taxAmount ?? 0) <= line.amount, {message:'税額は行の税込金額以下にしてください',path:['taxAmount']});
 
 export const journalEntryInputSchema = z.object({
   entryDate: z.coerce.date(),
@@ -155,7 +155,7 @@ export const invoiceInputSchema = z.object({
   invoiceNumber: z.string().min(1),
   issueDate: z.coerce.date(),
   dueDate: z.coerce.date().optional(),
-  status: z.enum(INVOICE_STATUSES).optional(),
+  status: z.never({ message: "請求書ステータスは専用操作でのみ変更できます" }).optional(),
   notes: z.string().optional(),
   items: z.array(invoiceItemInputSchema).min(1, "明細を1件以上入力してください"),
 });
